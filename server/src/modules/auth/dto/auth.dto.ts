@@ -1,0 +1,64 @@
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+
+export class SignupDto {
+  @IsString()
+  @IsNotEmpty()
+  companyName: string; // becomes the tenant name
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+}
+
+export class LoginDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
+export class RefreshDto {
+  @IsString()
+  @IsNotEmpty()
+  refreshToken: string;
+}
+
+export class VerifyEmailDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+}
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @IsString()
+  @MinLength(8)
+  password: string;
+}

@@ -18,9 +18,10 @@ export interface ApiResponse<T> {
 // If a service returns { data, meta }, we lift meta to the top level.
 // Otherwise the whole return value becomes `data`.
 @Injectable()
-export class ResponseInterceptor<T>
-  implements NestInterceptor<T, ApiResponse<T> | T>
-{
+export class ResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponse<T> | T
+> {
   constructor(private readonly reflector: Reflector) {}
 
   intercept(
