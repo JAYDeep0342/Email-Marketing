@@ -10,6 +10,13 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
+import { UsersModule } from './modules/users/users.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { RolesModule } from './modules/roles/roles.module';
+
+import { ContactsModule } from './modules/contacts/contacts.module';
+import { ListsModule } from './modules/lists/lists.module';
+import { SegmentsModule } from './modules/segments/segments.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -21,6 +28,12 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ClsModule.forRoot({ global: true, middleware: { mount: true } }),
     PrismaModule,
     AuthModule,
+    UsersModule,
+    TenantsModule,
+    RolesModule,
+    ContactsModule,
+    ListsModule,
+    SegmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],

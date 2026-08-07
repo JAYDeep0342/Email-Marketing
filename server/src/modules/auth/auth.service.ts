@@ -63,6 +63,17 @@ export class AuthService {
           },
         });
 
+        // Auto-assign the Owner system role to the first user.
+        // System roles have tenant_id NULL; the roles_select RLS policy
+        // allows reading them from any tenant context.
+        const ownerRole = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM roles WHERE tenant_id IS NULL AND name = 'Owner' LIMIT 1`;
+        if (ownerRole.length > 0) {
+          await tx.userRole.create({
+            data: { userId: user.id, roleId: ownerRole[0].id },
+          });
+        }
+
         return { tenant, user };
       });
 
