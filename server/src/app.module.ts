@@ -17,6 +17,9 @@ import { RolesModule } from './modules/roles/roles.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { ListsModule } from './modules/lists/lists.module';
 import { SegmentsModule } from './modules/segments/segments.module';
+
+import { TemplatesModule } from './modules/template/templates.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +37,7 @@ import { SegmentsModule } from './modules/segments/segments.module';
     ContactsModule,
     ListsModule,
     SegmentsModule,
+    TemplatesModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
