@@ -1,0 +1,131 @@
+Email Marketing/
+├── server
+│   ├── prisma
+│   │   ├── migrations
+│   │   │   ├── 20260805101623_init
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260805102202_rls_partitioning_indexes
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260806071600_auth_rls_bypass_functions
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260806152105_user_email_global_unique
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260806152810_auth_lookup_functions_created_at
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260807115311_allow_system_rows_rls
+│   │   │   │   └── migration.sql
+│   │   │   ├── 20260808053725_gallery_rows_rls
+│   │   │   │   └── migration.sql
+│   │   │   └── migration_lock.toml
+│   │   ├── schema.prisma
+│   │   ├── seed-gallery.ts
+│   │   └── seed.ts
+│   ├── src
+│   │   ├── common
+│   │   │   ├── decorators
+│   │   │   │   ├── current-user.decorator.ts
+│   │   │   │   ├── raw-response.decorator.ts
+│   │   │   │   └── tenant-id.decorator.ts
+│   │   │   ├── dto
+│   │   │   │   └── pagination.dto.ts
+│   │   │   ├── filters
+│   │   │   │   └── http-exception.filter.ts
+│   │   │   ├── interceptors
+│   │   │   │   ├── response.interceptor.ts
+│   │   │   │   └── tenant-context.interceptor.ts
+│   │   │   └── utils
+│   │   │       ├── email.util.ts
+│   │   │       ├── password.util.ts
+│   │   │       └── token.util.ts
+│   │   ├── config
+│   │   │   ├── configuration.ts
+│   │   │   └── env.validation.ts
+│   │   ├── modules
+│   │   │   ├── auth
+│   │   │   │   ├── decorators
+│   │   │   │   │   └── public.decorator.ts
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── auth.dto.ts
+│   │   │   │   │   └── pagination.dto.ts
+│   │   │   │   ├── guards
+│   │   │   │   │   └── jwt-auth.guard.ts
+│   │   │   │   ├── strategies
+│   │   │   │   │   └── jwt.strategy.ts
+│   │   │   │   ├── types
+│   │   │   │   │   └── jwt-payload.type.ts
+│   │   │   │   ├── auth.controller.ts
+│   │   │   │   ├── auth.module.ts
+│   │   │   │   └── auth.service.ts
+│   │   │   ├── contacts
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── contacts.dto.ts
+│   │   │   │   │   └── tags-suppressions.dto.ts
+│   │   │   │   ├── contacts.controller.ts
+│   │   │   │   ├── contacts.module.ts
+│   │   │   │   ├── contacts.service.ts
+│   │   │   │   ├── suppressions.service.ts
+│   │   │   │   ├── tags.controller.ts
+│   │   │   │   └── tags.service.ts
+│   │   │   ├── lists
+│   │   │   │   ├── dto
+│   │   │   │   │   └── lists.dto.ts
+│   │   │   │   ├── lists.controller.ts
+│   │   │   │   ├── lists.module.ts
+│   │   │   │   └── lists.service.ts
+│   │   │   ├── roles
+│   │   │   │   ├── dto
+│   │   │   │   │   └── roles.dto.ts
+│   │   │   │   ├── roles.controller.ts
+│   │   │   │   ├── roles.module.ts
+│   │   │   │   └── roles.service.ts
+│   │   │   ├── segments
+│   │   │   │   ├── dto
+│   │   │   │   │   └── segments.dto.ts
+│   │   │   │   ├── segments.controller.ts
+│   │   │   │   ├── segments.module.ts
+│   │   │   │   └── segments.service.ts
+│   │   │   ├── template
+│   │   │   │   ├── dto
+│   │   │   │   │   └── templates.dto.ts
+│   │   │   │   ├── categories.service.ts
+│   │   │   │   ├── form-templates.service.ts
+│   │   │   │   ├── signatures.service.ts
+│   │   │   │   ├── templates.controller.ts
+│   │   │   │   ├── templates.module.ts
+│   │   │   │   └── templates.service.ts
+│   │   │   ├── tenants
+│   │   │   │   ├── dto
+│   │   │   │   │   └── tenants.dto.ts
+│   │   │   │   ├── tenants.controller.ts
+│   │   │   │   ├── tenants.module.ts
+│   │   │   │   └── tenants.service.ts
+│   │   │   └── users
+│   │   │       ├── dto
+│   │   │       │   └── users.dto.ts
+│   │   │       ├── users.controller.ts
+│   │   │       ├── users.module.ts
+│   │   │       └── users.service.ts
+│   │   ├── prisma
+│   │   │   ├── prisma.module.ts
+│   │   │   └── prisma.service.ts
+│   │   ├── app.controller.spec.ts
+│   │   ├── app.controller.ts
+│   │   ├── app.module.ts
+│   │   ├── app.service.ts
+│   │   └── main.ts
+│   ├── test
+│   │   ├── app.e2e-spec.ts
+│   │   └── jest-e2e.json
+│   ├── .gitignore
+│   ├── .prettierrc
+│   ├── eslint.config.mjs
+│   ├── final schema (1).md
+│   ├── nest-cli.json
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── prisma.config.ts
+│   ├── README.md
+│   ├── skills-lock.json
+│   ├── tsconfig.build.json
+│   └── tsconfig.json
+└── .editorconfig

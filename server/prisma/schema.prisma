@@ -1505,12 +1505,17 @@ model VerificationResult {
 // ============================================================
 
 model Event {
-  id         String    @default(uuid()) @db.Uuid
+  id         String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid
   campaignId String?   @map("campaign_id") @db.Uuid
   contactId  String?   @map("contact_id") @db.Uuid
   emailJobId String?   @map("email_job_id") @db.Uuid
-  type       EventType
+  // `type` is TEXT + CHECK constraint in the DB, NOT a Postgres enum.
+  // `events` is partitioned and 6 log views (delivery_log, open_log, click_log,
+  // bounce_log, feedback_log, unsubscribe_log) read this column, so ALTER TYPE
+  // fails. Keeping it String here is what stops the repeated migrate drift.
+  // Allowed values are enforced by events_type_check — see 20260805102202.
+  type       String    @db.Text
   url        String?
   userAgent  String?   @map("user_agent")
   ipAddress  String?   @map("ip_address") @db.Inet
