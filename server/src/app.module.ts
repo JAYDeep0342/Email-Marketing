@@ -19,6 +19,7 @@ import { ListsModule } from './modules/lists/lists.module';
 import { SegmentsModule } from './modules/segments/segments.module';
 
 import { TemplatesModule } from './modules/template/templates.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { TemplatesModule } from './modules/template/templates.module';
     ListsModule,
     SegmentsModule,
     TemplatesModule,
+    CampaignsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
