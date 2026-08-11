@@ -69,6 +69,7 @@ import { SegmentsModule } from './modules/segments/segments.module';
 import { TemplatesModule } from './modules/template/templates.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { SendingModule } from './modules/sending/sending.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { SendingModule } from './modules/sending/sending.module';
     TemplatesModule,
     CampaignsModule,
     SendingModule,
+    TrackingModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],

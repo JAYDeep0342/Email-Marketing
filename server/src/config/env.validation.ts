@@ -67,4 +67,12 @@ export const envValidationSchema = Joi.object({
 
   // Credential encryption (Sending Engine)
   ENCRYPTION_KEY: Joi.string().min(16).required(),
+
+  // Tracking (Step 13)
+  // Signs open/click tokens. Falls back to ENCRYPTION_KEY in code if unset, but
+  // set a distinct one in production.
+  TRACKING_SECRET: Joi.string().min(16).optional(),
+  // Guards the dev webhook simulator. In production it is OFF unless explicitly
+  // set to 'true' (do NOT enable in prod).
+  SIMULATOR_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
 });

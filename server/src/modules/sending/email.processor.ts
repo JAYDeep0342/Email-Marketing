@@ -7,6 +7,10 @@ import { MailerService, OutgoingMail } from './mailer.service';
 import { UnsubscribeService } from './unsubscribe.service';
 import { decryptSecret } from '../../common/utils/crypto.util';
 import {
+  encodeTrackingToken,
+  signUrl,
+} from '../../common/utils/signed-token.util';
+import {
   EMAIL_QUEUE,
   EMAIL_JOB_ATTEMPTS,
   SendEmailJobData,
@@ -105,6 +109,7 @@ export class EmailProcessor extends WorkerHost {
 
       return {
         sendingServerId: ej.sendingServerId,
+        contactId: ej.contactId,
         contact,
         subject: campaign.subject,
         preheader: campaign.preheader,
@@ -131,7 +136,18 @@ export class EmailProcessor extends WorkerHost {
       unsubscribe_url: unsubUrl,
     };
     const subject = this.merge(prepared.subject, vars);
-    const html = this.withUnsubscribe(this.merge(prepared.html, vars), unsubUrl);
+    let html = this.withUnsubscribe(this.merge(prepared.html, vars), unsubUrl);
+
+    // ---- tracking (Step 13): rewrite links for clicks + append open pixel ----
+    // Self-contained signed token — the tracking endpoints need no DB lookup.
+    const trackToken = encodeTrackingToken({
+      j: emailJobId,
+      t: tenantId,
+      c: prepared.campaignId,
+      k: prepared.contactId,
+    });
+    html = this.rewriteLinks(html, base, trackToken, unsubUrl);
+    html = this.withPixel(html, `${base}/t/o/${trackToken}.gif`);
 
     const from = prepared.fromName
       ? `${prepared.fromName} <${prepared.fromEmail}>`
@@ -256,5 +272,33 @@ export class EmailProcessor extends WorkerHost {
     return html.includes('</body>')
       ? html.replace('</body>', `${footer}</body>`)
       : html + footer;
+  }
+
+  /**
+   * Rewrite http(s) <a href> targets through the click tracker. Skips the
+   * unsubscribe link and any mailto:/tel:/anchor links. Each target is signed
+   * so the redirect endpoint can't be abused as an open redirect.
+   */
+  private rewriteLinks(
+    html: string,
+    base: string,
+    token: string,
+    unsubUrl: string,
+  ): string {
+    return html.replace(
+      /href\s*=\s*(["'])(https?:\/\/[^"']+)\1/gi,
+      (match, quote, url) => {
+        if (url === unsubUrl) return match; // never track the unsubscribe link
+        const wrapped = `${base}/t/c/${token}?u=${encodeURIComponent(url)}&s=${signUrl(url)}`;
+        return `href=${quote}${wrapped}${quote}`;
+      },
+    );
+  }
+
+  private withPixel(html: string, pixelUrl: string): string {
+    const img = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;border:0;width:1px;height:1px" />`;
+    return html.includes('</body>')
+      ? html.replace('</body>', `${img}</body>`)
+      : html + img;
   }
 }
