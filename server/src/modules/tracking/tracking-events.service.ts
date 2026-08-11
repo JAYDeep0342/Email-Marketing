@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaClient } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NormalizedEvent } from './tracking.constants';
+import {
+  AUTOMATION_TRIGGER_EVENT,
+  AutomationTriggerPayload,
+} from '../automations/automations.constants';
 
 interface JobRef {
   id: string;
@@ -26,7 +31,10 @@ interface JobRef {
 export class TrackingEventsService {
   private readonly logger = new Logger(TrackingEventsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   /** Entry point used by webhook + open/click controllers. */
   async apply(ev: NormalizedEvent): Promise<void> {
@@ -77,6 +85,19 @@ export class TrackingEventsService {
           break;
       }
     });
+
+    // Fire automation triggers for engagement events (Step 15). Decoupled: we
+    // just push onto the bus; the automation listener enrolls if any active
+    // automation matches. Emitted AFTER commit so enrollment sees the event.
+    if (ev.type === 'open' || ev.type === 'click') {
+      const payload: AutomationTriggerPayload = {
+        tenantId: job.tenant_id,
+        triggerType: ev.type === 'open' ? 'email_opened' : 'email_clicked',
+        contactId: job.contact_id,
+        context: { campaignId: job.campaign_id ?? undefined },
+      };
+      this.eventEmitter.emit(AUTOMATION_TRIGGER_EVENT, payload);
+    }
   }
 
   // ---- resolve which job an event belongs to ----

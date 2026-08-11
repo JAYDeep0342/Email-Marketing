@@ -66,59 +66,55 @@ export class EmailProcessor extends WorkerHost {
         return null;
       }
 
-      const campaign = await tx.campaign.findFirst({
-        where: { id: ej.campaignId ?? undefined },
-        select: {
-          id: true,
-          subject: true,
-          preheader: true,
-          fromName: true,
-          fromEmail: true,
-          signatureId: true,
-          templateId: true,
-        },
-      });
-      if (!campaign) return null;
-
-      const [template, signature] = await Promise.all([
-        campaign.templateId
-          ? tx.template.findFirst({
-              where: { id: campaign.templateId, deletedAt: null },
-              select: { renderedHtml: true },
-            })
-          : null,
-        campaign.signatureId
-          ? tx.signature.findFirst({
-              where: { id: campaign.signatureId },
-              select: { fromName: true, fromEmail: true, replyTo: true },
-            })
-          : null,
-      ]);
-
-      // Signature identity WINS over inline campaign fields (project convention).
-      const fromName = signature?.fromName ?? campaign.fromName ?? '';
-      const fromEmail = signature?.fromEmail ?? campaign.fromEmail ?? '';
-      const replyTo = signature?.replyTo ?? undefined;
+      // Content source differs by origin:
+      //  - campaign email  -> campaignId set, content from the campaign row
+      //  - automation email -> automationRunId set (campaignId null), content
+      //    from the send_email step config (Step 15). email_jobs.automation_run_id
+      //    is exactly why the whole Sending Engine is reused for automations.
+      const src = ej.campaignId
+        ? await this.loadCampaignSource(tx, ej.campaignId)
+        : ej.automationRunId
+          ? await this.loadAutomationSource(tx, ej.automationRunId, ej.idempotencyKey)
+          : null;
+      if (!src) {
+        // The email_job row exists but its content source is missing/invalid
+        // (e.g. an automation send_email step with a bad/missing templateId, or
+        // a deleted campaign). Without this branch the row would sit in
+        // 'sending' forever — no SMTP call throws, so BullMQ never retries and
+        // onFailed() never runs. Mark it 'failed' here so it's visible and the
+        // reconciliation watchdog isn't needed to clean it up.
+        await tx.emailJob.updateMany({
+          where: { id: emailJobId, status: { in: ['queued', 'sending'] } },
+          data: {
+            status: 'failed',
+            error: ej.campaignId
+              ? 'campaign content source missing or invalid'
+              : 'automation step template missing or invalid',
+          },
+        });
+        return null;
+      }
 
       const rawToken = await this.unsubscribe.ensureToken(
         tx,
         tenantId,
         ej.contactId,
-        campaign.id,
+        src.campaignId, // null for automations — unsubscribe_tokens.campaign_id is nullable
       );
 
       return {
         sendingServerId: ej.sendingServerId,
         contactId: ej.contactId,
         contact,
-        subject: campaign.subject,
-        preheader: campaign.preheader,
-        html: template?.renderedHtml ?? '',
-        fromName,
-        fromEmail,
-        replyTo,
+        subject: src.subject,
+        preheader: src.preheader,
+        html: src.html,
+        fromName: src.fromName,
+        fromEmail: src.fromEmail,
+        replyTo: src.replyTo,
         rawToken,
-        campaignId: campaign.id,
+        campaignId: src.campaignId, // real campaign id, or null for automations
+        trackingKey: src.trackingKey, // non-empty id used inside the tracking token
       };
     });
 
@@ -143,7 +139,7 @@ export class EmailProcessor extends WorkerHost {
     const trackToken = encodeTrackingToken({
       j: emailJobId,
       t: tenantId,
-      c: prepared.campaignId,
+      c: prepared.trackingKey, // campaignId or automationRunId — always non-empty
       k: prepared.contactId,
     });
     html = this.rewriteLinks(html, base, trackToken, unsubUrl);
@@ -183,23 +179,27 @@ export class EmailProcessor extends WorkerHost {
         },
       });
 
-      await tx.campaignStat.updateMany({
-        where: { campaignId: prepared.campaignId },
-        data: { sentCount: { increment: 1 } },
-      });
-
-      // Finalize: if no email_jobs remain queued/sending, the campaign is sent.
-      const remaining = await tx.emailJob.count({
-        where: {
-          campaignId: prepared.campaignId,
-          status: { in: ['queued', 'sending'] },
-        },
-      });
-      if (remaining === 0) {
-        await tx.campaign.updateMany({
-          where: { id: prepared.campaignId, status: 'sending' },
-          data: { status: 'sent', sentAt: new Date() },
+      // Campaign bookkeeping only applies to campaign emails. Automation emails
+      // (campaignId null) have no campaign_stats row and no 'sending' campaign
+      // to finalize — their run lifecycle is owned by the automation engine.
+      if (prepared.campaignId) {
+        await tx.campaignStat.updateMany({
+          where: { campaignId: prepared.campaignId },
+          data: { sentCount: { increment: 1 } },
         });
+
+        const remaining = await tx.emailJob.count({
+          where: {
+            campaignId: prepared.campaignId,
+            status: { in: ['queued', 'sending'] },
+          },
+        });
+        if (remaining === 0) {
+          await tx.campaign.updateMany({
+            where: { id: prepared.campaignId, status: 'sending' },
+            data: { status: 'sent', sentAt: new Date() },
+          });
+        }
       }
     });
   }
@@ -257,6 +257,107 @@ export class EmailProcessor extends WorkerHost {
     } catch {
       return undefined;
     }
+  }
+
+  // ---- content source loaders (shared shape for the send flow) ----
+
+  private async loadCampaignSource(tx: any, campaignId: string) {
+    const campaign = await tx.campaign.findFirst({
+      where: { id: campaignId },
+      select: {
+        id: true,
+        subject: true,
+        preheader: true,
+        fromName: true,
+        fromEmail: true,
+        signatureId: true,
+        templateId: true,
+      },
+    });
+    if (!campaign) return null;
+    const [template, signature] = await Promise.all([
+      campaign.templateId
+        ? tx.template.findFirst({
+            where: { id: campaign.templateId, deletedAt: null },
+            select: { renderedHtml: true },
+          })
+        : null,
+      campaign.signatureId
+        ? tx.signature.findFirst({
+            where: { id: campaign.signatureId },
+            select: { fromName: true, fromEmail: true, replyTo: true },
+          })
+        : null,
+    ]);
+    // A campaign that REFERENCES a template but whose template is
+    // missing/soft-deleted must fail loudly — otherwise `renderedHtml ?? ''`
+    // would silently mail an empty-body email to real recipients. This mirrors
+    // loadAutomationSource's `if (!template) return null`. A campaign with no
+    // templateId at all is left as-is (template-less campaigns stay valid).
+    if (campaign.templateId && !template) return null;
+    return {
+      campaignId: campaign.id,
+      trackingKey: campaign.id,
+      subject: campaign.subject,
+      preheader: campaign.preheader,
+      html: template?.renderedHtml ?? '',
+      fromName: signature?.fromName ?? campaign.fromName ?? '',
+      fromEmail: signature?.fromEmail ?? campaign.fromEmail ?? '',
+      replyTo: signature?.replyTo ?? undefined,
+    };
+  }
+
+  /**
+   * Automation send_email content. The step config carries subject + templateId
+   * (+ optional signatureId / fromName / fromEmail). We recover which step
+   * produced this job from the deterministic idempotency key
+   * `auto:<runId>:step:<stepId>` (email_jobs has no step column).
+   */
+  private async loadAutomationSource(
+    tx: any,
+    automationRunId: string,
+    idempotencyKey: string,
+  ) {
+    const stepId = this.parseStepId(idempotencyKey);
+    if (!stepId) return null;
+    const step = await tx.automationStep.findFirst({
+      where: { id: stepId },
+      select: { config: true },
+    });
+    if (!step) return null;
+    const cfg = (step.config ?? {}) as any;
+    if (!cfg.templateId || !cfg.subject) return null;
+
+    const [template, signature] = await Promise.all([
+      tx.template.findFirst({
+        where: { id: cfg.templateId, deletedAt: null },
+        select: { renderedHtml: true },
+      }),
+      cfg.signatureId
+        ? tx.signature.findFirst({
+            where: { id: cfg.signatureId },
+            select: { fromName: true, fromEmail: true, replyTo: true },
+          })
+        : null,
+    ]);
+    if (!template) return null;
+
+    return {
+      campaignId: null as string | null,
+      trackingKey: automationRunId,
+      subject: cfg.subject as string,
+      preheader: (cfg.preheader as string) ?? null,
+      html: template.renderedHtml ?? '',
+      fromName: signature?.fromName ?? cfg.fromName ?? '',
+      fromEmail: signature?.fromEmail ?? cfg.fromEmail ?? '',
+      replyTo: signature?.replyTo ?? undefined,
+    };
+  }
+
+  private parseStepId(idempotencyKey: string): string | null {
+    // format: auto:<runId>:step:<stepId>
+    const m = /^auto:[^:]+:step:(.+)$/.exec(idempotencyKey);
+    return m ? m[1] : null;
   }
 
   private merge(input: string, vars: Record<string, string>): string {

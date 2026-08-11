@@ -49,6 +49,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ClsModule } from 'nestjs-cls';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -70,6 +71,7 @@ import { TemplatesModule } from './modules/template/templates.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { SendingModule } from './modules/sending/sending.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
+import { AutomationsModule } from './modules/automations/automations.module';
 
 @Module({
   imports: [
@@ -80,7 +82,8 @@ import { TrackingModule } from './modules/tracking/tracking.module';
       validationOptions: { abortEarly: false },
     }),
     ClsModule.forRoot({ global: true, middleware: { mount: true } }),
-    // One Redis connection for all BullMQ queues in the app.
+    // Decoupled domain events (triggers) — global so any module can emit.
+    EventEmitterModule.forRoot(),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -102,6 +105,7 @@ import { TrackingModule } from './modules/tracking/tracking.module';
     CampaignsModule,
     SendingModule,
     TrackingModule,
+    AutomationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
