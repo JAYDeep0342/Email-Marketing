@@ -72,6 +72,8 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { SendingModule } from './modules/sending/sending.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { AutomationsModule } from './modules/automations/automations.module';
+import { FormsModule } from './modules/forms/forms.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -106,6 +108,8 @@ import { AutomationsModule } from './modules/automations/automations.module';
     SendingModule,
     TrackingModule,
     AutomationsModule,
+    FormsModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],

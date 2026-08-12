@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from '../../common/utils/password.util';
 import { generateToken, hashToken } from '../../common/utils/token.util';
 import { JwtPayload } from './types/jwt-payload.type';
 import { SignupDto, LoginDto, ResetPasswordDto } from './dto/auth.dto';
+import { SubscriptionsService } from '../billing/subscriptions.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   // ---------------- SIGNUP ----------------
@@ -76,6 +78,11 @@ export class AuthService {
 
         return { tenant, user };
       });
+
+      // Start the trial now that the tenant is created and committed (Step 16A).
+      // Idempotent + returns null gracefully if no plan is seeded yet, so a
+      // billing hiccup here can never block signup itself.
+      await this.subscriptions.startTrial(result.tenant.id);
 
       // Generate email verification token (console-log for now)
       await this.createEmailVerification(result.user.id, result.user.email);

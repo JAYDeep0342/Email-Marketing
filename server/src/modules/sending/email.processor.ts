@@ -15,6 +15,7 @@ import {
   EMAIL_JOB_ATTEMPTS,
   SendEmailJobData,
 } from './sending.constants';
+import { BillingUsageService } from '../billing/billing-usage.service';
 
 /**
  * Sends exactly one email_job.
@@ -36,6 +37,7 @@ export class EmailProcessor extends WorkerHost {
     private readonly mailer: MailerService,
     private readonly unsubscribe: UnsubscribeService,
     private readonly config: ConfigService,
+    private readonly billingUsage: BillingUsageService,
   ) {
     super();
   }
@@ -202,6 +204,10 @@ export class EmailProcessor extends WorkerHost {
         }
       }
     });
+
+    // Outside tx2 on purpose (Step 16A): a usage-bump failure must never roll
+    // back an email that already sent successfully.
+    await this.billingUsage.recordEmailSent(tenantId);
   }
 
   @OnWorkerEvent('failed')

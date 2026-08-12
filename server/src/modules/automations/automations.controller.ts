@@ -13,6 +13,7 @@ import {
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import { paginated } from '../../common/dto/pagination.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CheckQuota } from '../billing/decorators/plan-gating.decorators';
 import { AutomationsService } from './automations.service';
 import { EnrollmentService } from './enrollment.service';
 import {
@@ -32,6 +33,7 @@ export class AutomationsController {
   ) {}
 
   // --- CRUD ---
+  @CheckQuota('automations')
   @Post()
   create(@TenantId() tenantId: string, @Body() dto: CreateAutomationDto) {
     return this.automations.create(tenantId, dto);

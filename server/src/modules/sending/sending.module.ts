@@ -13,6 +13,7 @@ import { CampaignDispatchService } from './campaign-dispatch.service';
 import { UnsubscribeService } from './unsubscribe.service';
 import { EmailProcessor } from './email.processor';
 import { MaintenanceProcessor } from './maintenance.processor';
+import { BillingModule } from '../billing/billing.module';
 
 /**
  * Sending Engine (Step 12).
@@ -27,6 +28,7 @@ import { MaintenanceProcessor } from './maintenance.processor';
       { name: EMAIL_QUEUE },
       { name: MAINTENANCE_QUEUE },
     ),
+    BillingModule, // BillingUsageService.recordEmailSent() after a successful send
   ],
   controllers: [SendingController, UnsubscribeController],
   providers: [

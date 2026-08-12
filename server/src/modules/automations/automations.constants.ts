@@ -8,6 +8,7 @@ export const TRIGGER_TYPES = [
   'contact_added_to_list',
   'email_opened',
   'email_clicked',
+  'form_submitted',
   'manual',
 ] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];

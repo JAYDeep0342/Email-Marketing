@@ -35,6 +35,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status = exception.getStatus();
       const res = exception.getResponse();
 
+      // Map status -> a stable machine-readable code — used as the default,
+      // but an exception can carry its own more specific `code` (e.g.
+      // PlanGatingGuard's NO_ACTIVE_PLAN / QUOTA_EXCEEDED / TENANT_SUSPENDED),
+      // which should win over the generic per-status one.
+      code = this.statusToCode(status);
+
       if (typeof res === 'string') {
         message = res;
       } else if (typeof res === 'object' && res !== null) {
@@ -45,10 +51,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
           (Array.isArray(r.message) && r.message.join(', ')) ||
           exception.message;
         if (Array.isArray(r.message)) details = r.message;
+        else if (r.details !== undefined) details = r.details;
+        if (typeof r.code === 'string') code = r.code;
       }
-
-      // Map status -> a stable machine-readable code
-      code = this.statusToCode(status);
     } else if (exception instanceof Error) {
       // Unexpected error — log the full stack, but don't leak it to the client
       message = 'Internal server error';

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { CheckQuota } from '../billing/decorators/plan-gating.decorators';
 import { ListsService } from './lists.service';
 import { CreateListDto, UpdateListDto, AddContactsDto } from './dto/lists.dto';
 
@@ -23,6 +24,7 @@ export class ListsController {
     return this.lists.list();
   }
 
+  @CheckQuota('lists')
   @Post()
   create(@TenantId() tenantId: string, @Body() dto: CreateListDto) {
     return this.lists.create(tenantId, dto);
