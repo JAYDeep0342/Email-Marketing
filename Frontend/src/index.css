@@ -1,0 +1,121 @@
+/*
+ * Design system — Email Marketing SaaS
+ *
+ * Structure follows shadcn/ui's convention:
+ *   - Colors are stored as HSL triples in CSS custom properties
+ *     (e.g. `--primary: 142 71% 45%`), NOT as hex.
+ *   - Tailwind (tailwind.config.ts) wraps them:
+ *     `hsl(var(--primary))` -> `bg-primary`, `text-primary`, etc.
+ *   - Two blocks: :root is the light theme, .dark is the dark theme.
+ *
+ * We are dark-first — index.html has <html class="dark">, so the .dark
+ * block is what actually paints on load. The :root/light block is kept in
+ * sync for the future theme toggle (Chunk 3+).
+ *
+ * Green accent: emerald-500 in Tailwind's default palette.
+ * HSL: hue 142, saturation 71%, lightness 45% — kept identical in both
+ * modes so brand color reads the same on light and dark surfaces.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonts — served by Google Fonts. Inter for UI, JetBrains Mono for IDs / API
+   keys / invoice numbers (matches the design guide). Preconnect + display=swap
+   avoids a font-loading flash. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  :root {
+    /* Light theme — used when <html> does NOT have `dark` class */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary = brand green. Stays green in both modes. */
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 142 71% 45%; /* focus ring uses brand green */
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark theme — the DEFAULT (see index.html <html class="dark">). Tuned to
+       match the Acelle Mail reference screenshots: near-black page bg, one
+       step lighter for surfaces, green stays green. */
+    --background: 222 47% 5%;     /* slate-950-ish, slightly deeper */
+    --foreground: 210 40% 98%;    /* slate-50 */
+
+    --card: 222 47% 8%;           /* slightly lighter than page */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 142 71% 45%;       /* SAME green as light — brand consistency */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 15%;     /* subtle surface for chips, subtle bg */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 65%; /* slate-400 — captions, secondary text */
+
+    --accent: 217 33% 15%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 33% 15%;        /* subtle, blends with cards */
+    --input: 217 33% 15%;
+    --ring: 142 71% 45%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Utility: use `font-mono` in JSX for IDs, tokens, invoice numbers */
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}
