@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { CheckQuota } from '../billing/decorators/plan-gating.decorators';
 import { CampaignsService } from './campaigns.service';
 import { CampaignRecipientsService } from './campaign-recipients.service';
 import {
@@ -28,6 +29,7 @@ export class CampaignsController {
   ) {}
 
   // --- CRUD ---
+  @CheckQuota('campaigns')
   @Post()
   create(@TenantId() tenantId: string, @Body() dto: CreateCampaignDto) {
     return this.campaigns.create(tenantId, dto);
@@ -61,6 +63,13 @@ export class CampaignsController {
   }
 
   // --- Status actions (200, not 201 — they mutate an existing resource) ---
+  // NOTE (Step 16A): this codebase has no separate "send now" endpoint —
+  // `schedule` is the action that actually queues a campaign for sending
+  // (CampaignDispatchService's poller picks up due 'scheduled' rows), so
+  // that's where the emails_month gate belongs. unit=1 only checks "can this
+  // tenant send AT ALL this month" — a full recipient-count-aware check is
+  // deferred to 16B per INTEGRATION.md.
+  @CheckQuota('emails_month')
   @Post(':id/schedule')
   @HttpCode(200)
   schedule(@Param('id') id: string, @Body() dto: ScheduleCampaignDto) {

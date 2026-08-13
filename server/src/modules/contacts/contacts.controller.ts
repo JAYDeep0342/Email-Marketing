@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { CheckQuota } from '../billing/decorators/plan-gating.decorators';
 import { ContactsService } from './contacts.service';
 import {
   CreateContactDto,
@@ -23,6 +24,7 @@ import {
 export class ContactsController {
   constructor(private readonly contacts: ContactsService) {}
 
+  @CheckQuota('contacts')
   @Post()
   create(@TenantId() tenantId: string, @Body() dto: CreateContactDto) {
     return this.contacts.create(tenantId, dto);
