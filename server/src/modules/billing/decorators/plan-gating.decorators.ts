@@ -1,8 +1,17 @@
-import { SetMetadata } from '@nestjs/common';
+import { ExecutionContext, SetMetadata } from '@nestjs/common';
 import { UsageMetric } from '../billing.constants';
 
 export const CHECK_QUOTA_KEY = 'billing:check_quota';
 export const REQUIRES_FEATURE_KEY = 'billing:requires_feature';
+
+/**
+ * `unit` can be a static number, or a function resolved at request time
+ * against the full ExecutionContext — for a route whose consumption depends
+ * on the request body (e.g. a bulk import), a static number can't express
+ * "however many rows are in this request." Same pattern as @nestjs/throttler's
+ * `Resolvable<T>`.
+ */
+export type QuotaUnit = number | ((ctx: ExecutionContext) => number);
 
 /**
  * Mark a route as consuming a metered quota. The PlanGatingGuard checks:
@@ -19,7 +28,7 @@ export const REQUIRES_FEATURE_KEY = 'billing:requires_feature';
  * send, callers can override to the recipient count via a request-time hook
  * (see billing-usage.service for the increment path).
  */
-export const CheckQuota = (metric: UsageMetric, unit = 1) =>
+export const CheckQuota = (metric: UsageMetric, unit: QuotaUnit = 1) =>
   SetMetadata(CHECK_QUOTA_KEY, { metric, unit });
 
 /**

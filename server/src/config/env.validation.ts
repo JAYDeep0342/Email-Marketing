@@ -31,8 +31,14 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().default(3000),
 
-  // App
-  APP_PUBLIC_URL: Joi.string().uri().default('http://localhost:3000/api'),
+  // App — URL/origin values are environment-specific and must come from
+  // .env with no baked-in fallback, so a missing var fails fast at startup
+  // instead of silently defaulting to a local URL in some other environment.
+  APP_PUBLIC_URL: Joi.string().uri().required(),
+  // Frontend origin used to build links inside auth emails (verify/reset).
+  FRONTEND_URL: Joi.string().uri().required(),
+  // Comma-separated list of allowed CORS origins (BUG #5).
+  CORS_ORIGINS: Joi.string().required(),
 
   // Database
   DB_HOST: Joi.string().required(),
@@ -75,4 +81,22 @@ export const envValidationSchema = Joi.object({
   // Guards the dev webhook simulator. In production it is OFF unless explicitly
   // set to 'true' (do NOT enable in prod).
   SIMULATOR_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+
+  // Rate limiting (Step 16C / BUG #2). Global baseline, plus tighter windows
+  // on auth (login/signup) and public form submission specifically.
+  THROTTLE_TTL_MS: Joi.number().default(60000),
+  THROTTLE_LIMIT: Joi.number().default(100),
+  AUTH_THROTTLE_TTL_MS: Joi.number().default(60000),
+  AUTH_THROTTLE_LIMIT: Joi.number().default(5),
+  FORMS_THROTTLE_TTL_MS: Joi.number().default(60000),
+  FORMS_THROTTLE_LIMIT: Joi.number().default(10),
+
+  // Razorpay. All optional — billing simply stays unconfigured (existing
+  // ServiceUnavailableException behavior) when these are absent; the app
+  // must still boot without them.
+  RAZORPAY_KEY_ID: Joi.string().optional(),
+  RAZORPAY_KEY_SECRET: Joi.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: Joi.string().optional(),
+  // JSON string: {"<ourPlanId>":"<razorpayPlanId>", ...}
+  RAZORPAY_PLAN_MAP: Joi.string().optional(),
 });

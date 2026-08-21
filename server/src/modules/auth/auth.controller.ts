@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, HttpCode } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
@@ -12,17 +13,27 @@ import {
   ResetPasswordDto,
 } from './dto/auth.dto';
 
+// Resolver functions (not static values) so these are read from process.env
+// at request time — @Throttle()'s options are evaluated as this class is
+// defined, before ConfigModule has parsed .env, so a static value here would
+// always see the Joi-default rather than what's actually configured.
+const authThrottleLimit = () => parseInt(process.env.AUTH_THROTTLE_LIMIT ?? '5', 10);
+const authThrottleTtlMs = () =>
+  parseInt(process.env.AUTH_THROTTLE_TTL_MS ?? '60000', 10);
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  @Throttle({ default: { limit: authThrottleLimit, ttl: authThrottleTtlMs } })
   @Post('signup')
   signup(@Body() dto: SignupDto) {
     return this.auth.signup(dto);
   }
 
   @Public()
+  @Throttle({ default: { limit: authThrottleLimit, ttl: authThrottleTtlMs } })
   @Post('login')
   @HttpCode(200)
   login(@Body() dto: LoginDto, @Req() req: Request) {

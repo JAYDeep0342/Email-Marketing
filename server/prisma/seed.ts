@@ -37,7 +37,37 @@ const SYSTEM_ROLES = [
   },
 ];
 
+/**
+ * The app_user role is created (without a usable password) by migration
+ * 20260805110000_app_user_role_and_grants — a migration file is committed to
+ * git, so it can't safely hold the real password. This sets it from
+ * APP_DATABASE_URL in .env instead, every time seed runs. Idempotent: ALTER
+ * ROLE ... WITH PASSWORD is a plain overwrite, safe to re-run.
+ */
+async function syncAppUserPassword() {
+  const appUrl = process.env.APP_DATABASE_URL;
+  if (!appUrl) {
+    throw new Error(
+      'APP_DATABASE_URL is not set — cannot sync the app_user password.',
+    );
+  }
+  const password = new URL(appUrl).password;
+  if (!password) {
+    throw new Error(
+      'APP_DATABASE_URL has no password component — cannot sync app_user.',
+    );
+  }
+  // ALTER ROLE is a utility statement, not DML — it doesn't accept bind
+  // parameters, so the value is escaped the standard SQL way (doubled single
+  // quotes) instead. Source is our own .env, not user input.
+  const escaped = password.replace(/'/g, "''");
+  await prisma.$executeRawUnsafe(`ALTER ROLE app_user WITH PASSWORD '${escaped}'`);
+  console.log('Synced app_user password from APP_DATABASE_URL.');
+}
+
 async function main() {
+  await syncAppUserPassword();
+
   console.log('Seeding permissions...');
   for (const [key, description] of PERMISSIONS) {
     await prisma.permission.upsert({

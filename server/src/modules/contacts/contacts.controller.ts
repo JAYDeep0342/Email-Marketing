@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ExecutionContext,
   Get,
   HttpCode,
   Param,
@@ -20,6 +21,15 @@ import {
   AddTagDto,
 } from './dto/contacts.dto';
 
+// Guards run BEFORE ValidationPipe, so at this point request.body is still
+// the raw parsed JSON, not an ImportContactsDto instance — reading
+// .contacts.length here is the only way to know the batch size at gate time.
+// This is a conservative count (pre-dedup/pre-validation), same tradeoff as
+// checking any other batch operation before doing the work: it can reject an
+// import that would've fit after dedup, but it can never let one exceed quota.
+const importBatchSize = (ctx: ExecutionContext): number =>
+  ctx.switchToHttp().getRequest().body?.contacts?.length ?? 0;
+
 @Controller('contacts')
 export class ContactsController {
   constructor(private readonly contacts: ContactsService) {}
@@ -35,6 +45,7 @@ export class ContactsController {
     return this.contacts.list(q);
   }
 
+  @CheckQuota('contacts', importBatchSize)
   @Post('import')
   import(@TenantId() tenantId: string, @Body() dto: ImportContactsDto) {
     return this.contacts.import(tenantId, dto);

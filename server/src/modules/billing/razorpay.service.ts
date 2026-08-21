@@ -4,17 +4,18 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { PrismaService } from '../../prisma/prisma.service';
-import { decryptSecret } from '../../common/utils/crypto.util';
 
 /**
  * Thin wrapper around Razorpay's API. Not marked @Global â imported into
  * BillingModule only.
  *
- * Credentials are stored in payment_gateways.encrypted_credentials as JSON:
- *   { keyId: "...", keySecret: "...", webhookSecret: "..." }
- * ...encrypted with the same helper the SendingServer secrets use.
+ * Credentials come from env (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET /
+ * RAZORPAY_WEBHOOK_SECRET) â config-driven like every other credential in
+ * this app, not stored in the DB. (The payment_gateways table + the
+ * encryptSecret/decryptSecret helper still exist and are still used
+ * elsewhere, e.g. SendingServer SMTP creds â just no longer for Razorpay.)
  *
  * We use the REST API directly (fetch) rather than the razorpay npm package
  * so we don't add a heavy dep for the four calls we need. Every call goes
@@ -31,33 +32,26 @@ export class RazorpayService {
     webhookSecret: string;
   } | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly config: ConfigService) {}
 
-  // Loads active Razorpay gateway creds on demand. Throws if none configured
-  // so callers get a clean 503 instead of a runtime null-deref.
+  // Loads Razorpay creds from env on demand. Throws if any are missing so
+  // callers get a clean 503 instead of a runtime null-deref — same behavior
+  // as before, just a different source.
   private async getCreds() {
     if (this.cachedCreds) return this.cachedCreds;
 
-    const gateway = await this.prisma.paymentGateway.findFirst({
-      where: { provider: 'razorpay', isActive: true },
-    });
-    if (!gateway) {
+    const keyId = this.config.get<string>('razorpay.keyId');
+    const keySecret = this.config.get<string>('razorpay.keySecret');
+    const webhookSecret = this.config.get<string>('razorpay.webhookSecret');
+
+    if (!keyId || !keySecret || !webhookSecret) {
       throw new ServiceUnavailableException(
-        'Razorpay is not configured. Add a payment_gateways row with provider=razorpay.',
+        'Razorpay is not configured. Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET.',
       );
     }
 
-    try {
-      const creds = JSON.parse(decryptSecret(gateway.encryptedCredentials));
-      if (!creds.keyId || !creds.keySecret || !creds.webhookSecret) {
-        throw new Error('missing keyId / keySecret / webhookSecret');
-      }
-      this.cachedCreds = creds;
-      return creds;
-    } catch (e) {
-      this.logger.error(`Razorpay creds decrypt failed: ${(e as Error).message}`);
-      throw new ServiceUnavailableException('Razorpay credentials invalid');
-    }
+    this.cachedCreds = { keyId, keySecret, webhookSecret };
+    return this.cachedCreds;
   }
 
   private async call<T>(
@@ -154,7 +148,8 @@ export class RazorpayService {
     }
   }
 
-  // Called when platform admin rotates keys via the payment-gateways admin API.
+  // Not currently called anywhere — kept in case a future hot-reload-config
+  // path needs to force a re-read of RAZORPAY_* env vars without a restart.
   invalidateCache() {
     this.cachedCreds = null;
   }

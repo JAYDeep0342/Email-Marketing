@@ -13,6 +13,7 @@ import { generateToken, hashToken } from '../../common/utils/token.util';
 import { JwtPayload } from './types/jwt-payload.type';
 import { SignupDto, LoginDto, ResetPasswordDto } from './dto/auth.dto';
 import { SubscriptionsService } from '../billing/subscriptions.service';
+import { MailerService } from '../sending/mailer.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly mailer: MailerService,
   ) {}
 
   // ---------------- SIGNUP ----------------
@@ -269,6 +271,14 @@ export class AuthService {
     // Console-log for now (real SMTP later)
     this.logger.log(`🔑 PASSWORD RESET for ${user.email}: token = ${raw}`);
 
+    const resetUrl = `${this.config.get<string>('app.frontendUrl')}/auth/reset-password?token=${raw}`;
+    await this.mailer.send({
+      to: user.email,
+      from: this.config.get<string>('mail.user') || 'no-reply@example.com',
+      subject: 'Reset your password',
+      html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+    });
+
     return { message: 'If the email exists, a reset link was sent' };
   }
 
@@ -366,6 +376,14 @@ export class AuthService {
         VALUES (gen_random_uuid(), ${userId}::uuid, ${hash}, ${expiresAt}, now())`;
 
     this.logger.log(`📧 EMAIL VERIFICATION for ${email}: token = ${raw}`);
+
+    const verifyUrl = `${this.config.get<string>('app.frontendUrl')}/auth/verify-email?token=${raw}`;
+    await this.mailer.send({
+      to: email,
+      from: this.config.get<string>('mail.user') || 'no-reply@example.com',
+      subject: 'Verify your email',
+      html: `<p>Click the link below to verify your email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
+    });
   }
 
   private slugify(name: string): string {

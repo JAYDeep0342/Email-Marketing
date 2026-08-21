@@ -50,6 +50,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -95,6 +96,18 @@ import { BillingModule } from './modules/billing/billing.module';
         },
       }),
     }),
+    // Global rate limiting (BUG #2). Tighter per-route overrides (auth,
+    // public form submit) are applied via @Throttle() on those handlers.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          name: 'default',
+          ttl: config.get<number>('throttle.ttlMs', 60000),
+          limit: config.get<number>('throttle.limit', 100),
+        },
+      ],
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -112,6 +125,10 @@ import { BillingModule } from './modules/billing/billing.module';
     BillingModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

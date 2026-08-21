@@ -279,6 +279,10 @@ model User {
   mfaSecret       String?    @map("mfa_secret")
   status          UserStatus @default(active)
   lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  // BUG #3: platform-operator flag, checked by PlatformAdminGuard on
+  // /api/admin/plans/*. Not a tenant Role — a normal tenant user can also
+  // be a platform admin. Never set via any API; DB-only for now.
+  isPlatformAdmin Boolean    @default(false) @map("is_platform_admin")
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -887,6 +891,10 @@ model Blacklist {
   // NOTE: two partial unique indexes (tenant rows vs global NULL rows)
   // added via raw SQL migration in Step 4C.
   @@index([value])
+  // BUG #7: RLS filters every query by tenant_id; without this, the
+  // tenant-wide read in campaign-recipients.service.ts (no app-level WHERE
+  // at all, RLS-only) forces a full scan as this table grows.
+  @@index([tenantId])
   @@map("blacklist")
 }
 
@@ -1107,6 +1115,9 @@ model FormSubmission {
   form   Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
 
   @@index([formId])
+  // BUG #7: RLS filters every query by tenant_id; formId alone doesn't cover
+  // that implicit predicate as this table grows.
+  @@index([tenantId])
   @@map("form_submissions")
 }
 
@@ -1342,6 +1353,11 @@ model UnsubscribeToken {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
+  // BUG #7: composite, not plain tenantId — unsubscribe.service.ts's
+  // ensureToken() runs on every single email send and filters on exactly
+  // (contactId, campaignId) together; RLS adds tenant_id as an implicit
+  // third predicate. This covers that exact hot-path WHERE clause.
+  @@index([tenantId, contactId, campaignId])
   @@map("unsubscribe_tokens")
 }
 
