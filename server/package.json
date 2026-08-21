@@ -30,6 +30,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.4.7",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "bcrypt": "^6.0.0",
@@ -90,5 +91,13 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.9.1": true,
+    "bcrypt@6.0.0": true,
+    "esbuild@0.28.1": true,
+    "msgpackr-extract@3.0.4": true,
+    "prisma@7.9.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }
