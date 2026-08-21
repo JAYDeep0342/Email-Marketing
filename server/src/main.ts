@@ -1,5 +1,6 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -48,8 +49,23 @@ async function bootstrap() {
   // API prefix — all routes become /api/...
   app.setGlobalPrefix('api');
 
+  // Swagger docs — auto-generated from controllers + DTOs (see @nestjs/swagger
+  // plugin in nest-cli.json, which infers request/response shapes from
+  // class-validator decorators without needing @ApiProperty everywhere).
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('EmailMarketing API')
+    .setDescription(
+      'Auto-generated API reference for every controller currently registered in the app.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDocument);
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`🚀 Server running on http://localhost:${port}/api`);
+  console.log(`📚 API docs available at http://localhost:${port}/docs`);
 }
 bootstrap();
