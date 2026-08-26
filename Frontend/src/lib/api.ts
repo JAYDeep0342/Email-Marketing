@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { ApiErrorBody, AuthTokens } from '@/types/api';
+import { ApiErrorBody, AuthTokens, PaginatedEnvelope, PaginationMeta } from '@/types/api';
 
 /**
  * Axios client for the NestJS backend.
@@ -127,6 +127,18 @@ export async function apiCall<T>(
 ): Promise<T> {
   const res = await fn();
   return res.data.data;
+}
+
+/**
+ * Same idea as apiCall, but for list endpoints — `data` and `meta` are
+ * siblings on the envelope (see PaginatedEnvelope), so unwrapping to just
+ * `.data` would silently drop pagination info. Used by usePaginatedQuery.
+ */
+export async function apiCallPaginated<T>(
+  fn: () => Promise<{ data: PaginatedEnvelope<T> }>,
+): Promise<{ data: T[]; meta: PaginationMeta }> {
+  const res = await fn();
+  return { data: res.data.data, meta: res.data.meta };
 }
 
 /**

@@ -1,11 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginated } from '../../common/dto/pagination.dto';
 import { CreateListDto, UpdateListDto } from './dto/lists.dto';
+import {
+  AUTOMATION_TRIGGER_EVENT,
+  TRIGGER_CONTACT_ADDED_TO_LIST,
+} from './lists.constants';
 
 @Injectable()
 export class ListsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   async list() {
     return this.prisma.withCurrentTenant(async (tx) => {
@@ -46,8 +54,8 @@ export class ListsService {
     });
   }
 
-  async addContacts(listId: string, contactIds: string[]) {
-    return this.prisma.withCurrentTenant(async (tx) => {
+  async addContacts(tenantId: string, listId: string, contactIds: string[]) {
+    const result = await this.prisma.withCurrentTenant(async (tx) => {
       const list = await tx.list.findFirst({ where: { id: listId }, select: { id: true } });
       if (!list) throw new NotFoundException('List not found');
 
@@ -62,8 +70,24 @@ export class ListsService {
         data: validIds.map((contactId) => ({ listId, contactId })),
         skipDuplicates: true,
       });
-      return { added: validIds.length, skipped: contactIds.length - validIds.length };
+      return { added: validIds.length, skipped: contactIds.length - validIds.length, validIds };
     });
+
+    // Fired outside the tx (non-blocking), one per contact so the listener's
+    // per-contact enrollment check runs for each — same pattern as
+    // forms-submissions.service.ts / contacts.service.ts. Deliberately
+    // per-contact (unlike bulk import): adding to a specific list is exactly
+    // the trigger-worthy action this event exists for.
+    for (const contactId of result.validIds) {
+      this.events.emit(AUTOMATION_TRIGGER_EVENT, {
+        tenantId,
+        triggerType: TRIGGER_CONTACT_ADDED_TO_LIST,
+        contactId,
+        context: { listId },
+      });
+    }
+
+    return { added: result.added, skipped: result.skipped };
   }
 
   async removeContact(listId: string, contactId: string) {

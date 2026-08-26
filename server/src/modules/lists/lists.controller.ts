@@ -42,8 +42,12 @@ export class ListsController {
 
   @Post(':id/contacts')
   @HttpCode(200)
-  addContacts(@Param('id') id: string, @Body() dto: AddContactsDto) {
-    return this.lists.addContacts(id, dto.contactIds);
+  addContacts(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: AddContactsDto,
+  ) {
+    return this.lists.addContacts(tenantId, id, dto.contactIds);
   }
 
   @Delete(':id/contacts/:contactId')

@@ -28,6 +28,23 @@ export interface ApiErrorBody {
   };
 }
 
+// ---- Paginated list envelope (from common/dto/pagination.dto.ts's
+// paginated() helper). `data` and `meta` are siblings, NOT nested —
+// list endpoints return { success, data: T[], meta }. ----
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface PaginatedEnvelope<T> {
+  success: true;
+  data: T[];
+  meta: PaginationMeta;
+}
+
 // ---- Auth ----
 
 export interface AuthTokens {
