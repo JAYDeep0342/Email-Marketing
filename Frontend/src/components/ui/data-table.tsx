@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -14,10 +15,10 @@ import { cn } from '@/lib/utils';
 /**
  * DataTable — generic paginated-list wrapper around the Table primitives.
  *
- * Handles the three states every list screen needs (loading skeleton, empty
- * state, Prev/Next pagination) so feature screens only supply columns + rows.
+ * Handles the four states every list screen needs (loading skeleton, error,
+ * empty, Prev/Next pagination) so feature screens only supply columns + rows.
  * Pairs with usePaginatedQuery (hooks/use-paginated-query.ts): pass its
- * `rows`/`meta`/`isLoading` straight through.
+ * `rows`/`meta`/`isLoading`/`isError`/`error` straight through.
  */
 export interface DataTableColumn<T> {
   key: string;
@@ -37,6 +38,10 @@ export interface DataTableProps<T> {
   /** True while a background refetch (e.g. next page) is in flight but
    * previous rows are still shown — dims the table instead of blanking it. */
   isFetching?: boolean;
+  /** True when the query itself failed — takes priority over the empty
+   * state so a real error never reads as "no results". */
+  isError?: boolean;
+  errorMessage?: React.ReactNode;
 }
 
 export function DataTable<T>({
@@ -48,6 +53,8 @@ export function DataTable<T>({
   meta,
   onPageChange,
   isFetching,
+  isError,
+  errorMessage = 'Something went wrong loading this data.',
 }: DataTableProps<T>) {
   return (
     <div className="space-y-4">
@@ -73,6 +80,15 @@ export function DataTable<T>({
                   ))}
                 </TableRow>
               ))
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-destructive">
+                  <div className="flex items-center justify-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {errorMessage}
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">

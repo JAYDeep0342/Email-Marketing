@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { SegmentsService } from './segments.service';
 import {
   CreateSegmentDto,
@@ -21,8 +22,8 @@ export class SegmentsController {
   constructor(private readonly segments: SegmentsService) {}
 
   @Get()
-  list() {
-    return this.segments.list();
+  list(@Query() q: PaginationDto) {
+    return this.segments.list(q.page, q.limit);
   }
 
   @Post()

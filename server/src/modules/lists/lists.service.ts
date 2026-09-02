@@ -15,19 +15,44 @@ export class ListsService {
     private readonly events: EventEmitter2,
   ) {}
 
-  async list() {
+  async list(page: number, limit: number) {
     return this.prisma.withCurrentTenant(async (tx) => {
-      const lists = await tx.list.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: { _count: { select: { listContacts: true } } },
-      });
-      return lists.map((l) => ({
+      const [rows, total] = await Promise.all([
+        tx.list.findMany({
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+          include: { _count: { select: { listContacts: true } } },
+        }),
+        tx.list.count(),
+      ]);
+      const data = rows.map((l) => ({
         id: l.id,
         name: l.name,
         description: l.description,
         contactCount: l._count.listContacts,
         createdAt: l.createdAt,
       }));
+      return paginated(data, total, page, limit);
+    });
+  }
+
+  // GET /lists/:id — needed by the list-detail screen to show the list's
+  // own name/description above its contacts table.
+  async findOne(id: string) {
+    return this.prisma.withCurrentTenant(async (tx) => {
+      const list = await tx.list.findFirst({
+        where: { id },
+        include: { _count: { select: { listContacts: true } } },
+      });
+      if (!list) throw new NotFoundException('List not found');
+      return {
+        id: list.id,
+        name: list.name,
+        description: list.description,
+        contactCount: list._count.listContacts,
+        createdAt: list.createdAt,
+      };
     });
   }
 

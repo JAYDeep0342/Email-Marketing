@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth.store';
+import { SubscriptionBanner } from '@/features/billing/subscription-banner';
 import { LogOut } from 'lucide-react';
 
 /**
@@ -24,13 +25,20 @@ export default function AppLayout() {
         <nav className="space-y-1 text-sm">
           <SidebarLink to="/app">Dashboard</SidebarLink>
           <SidebarLink to="/app/contacts">Contacts</SidebarLink>
+          <SidebarLink to="/app/lists">Lists</SidebarLink>
+          <SidebarLink to="/app/segments">Segments</SidebarLink>
           <SidebarLink to="/app/campaigns">Campaigns</SidebarLink>
+          <SidebarLink to="/app/automations">Automations</SidebarLink>
           <SidebarLink to="/app/templates">Templates</SidebarLink>
+          <SidebarLink to="/app/forms">Forms</SidebarLink>
+          <SidebarLink to="/app/billing">Billing</SidebarLink>
         </nav>
       </aside>
 
       {/* Main column */}
       <div className="flex flex-1 flex-col">
+        <SubscriptionBanner />
+
         {/* Top bar */}
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
           <div className="text-sm text-muted-foreground">

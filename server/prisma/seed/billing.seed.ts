@@ -34,7 +34,7 @@ async function main() {
     update: {},
     create: {
       code: 'INR',
-      symbol: 'â¹',
+      symbol: '₹',
       name: 'Indian Rupee',
       isBase: true,
       isActive: true,

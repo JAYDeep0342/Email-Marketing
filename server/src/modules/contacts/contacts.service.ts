@@ -99,15 +99,25 @@ export class ContactsService {
         where.contactTags = { some: { tagId: q.tagId } };
       }
 
-      const [data, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         tx.contact.findMany({
           where,
           orderBy: { createdAt: 'desc' },
           skip: (q.page - 1) * q.limit,
           take: q.limit,
+          include: {
+            contactTags: { select: { tag: { select: { id: true, name: true } } } },
+          },
         }),
         tx.contact.count({ where }),
       ]);
+      // Same tags-projection as findOne() — flatten contactTags -> tags so
+      // the contacts table can render a Tags column without an extra
+      // request per row.
+      const data = rows.map(({ contactTags, ...rest }) => ({
+        ...rest,
+        tags: contactTags.map((ct) => ct.tag),
+      }));
       return paginated(data, total, q.page, q.limit);
     });
   }
