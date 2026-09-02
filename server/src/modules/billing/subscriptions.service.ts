@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaClient } from '../../generated/prisma/client';
 import { RazorpayService } from './razorpay.service';
@@ -27,6 +28,7 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly razorpay: RazorpayService,
+    private readonly config: ConfigService,
   ) {}
 
   // ============================================================
@@ -122,13 +124,13 @@ export class SubscriptionsService {
       throw new BadRequestException('Plan is not available for subscription');
     }
 
-    // Razorpay Plan ID lookup. The super admin sets this via
-    // platform_settings.key='razorpay.plan_map' -> { [ourPlanId]: rzpPlanId }.
-    // Kept out of the Plan schema to avoid a migration; it's a config concern.
-    const setting = await this.prisma.platformSetting.findUnique({
-      where: { key: 'razorpay.plan_map' },
-    });
-    const planMap = (setting?.value ?? {}) as Record<string, string>;
+    // Razorpay Plan ID lookup. Set via RAZORPAY_PLAN_MAP in .env ->
+    // { [ourPlanId]: rzpPlanId }. Config-driven like every other credential
+    // in this app — no DB row, no admin step, just edit .env and redeploy.
+    const planMap = this.config.get<Record<string, string>>(
+      'razorpay.planMap',
+      {},
+    );
     const razorpayPlanId = planMap[planId];
     if (!razorpayPlanId) {
       throw new BadRequestException(

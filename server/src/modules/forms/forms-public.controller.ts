@@ -7,9 +7,18 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { FormsSubmissionsService } from './forms-submissions.service';
 import { SubmitFormDto } from './dto/forms.dto';
+
+// See auth.controller.ts for why these are resolver functions, not static
+// values: @Throttle() metadata is set at class-definition time, before
+// ConfigModule has parsed .env.
+const formsThrottleLimit = () =>
+  parseInt(process.env.FORMS_THROTTLE_LIMIT ?? '10', 10);
+const formsThrottleTtlMs = () =>
+  parseInt(process.env.FORMS_THROTTLE_TTL_MS ?? '60000', 10);
 
 /**
  * Public form submit. No auth, no tenant on the request — the formId in the
@@ -24,6 +33,7 @@ export class FormsPublicController {
   constructor(private readonly submissions: FormsSubmissionsService) {}
 
   @Public()
+  @Throttle({ default: { limit: formsThrottleLimit, ttl: formsThrottleTtlMs } })
   @Post(':formId/submissions')
   @HttpCode(201)
   submit(

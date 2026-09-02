@@ -9,13 +9,26 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { FORM_TYPES } from '../forms.constants';
 import type { FormTypeValue } from '../forms.constants';
 
 // ============================================================
 //  Admin CRUD DTOs
 // ============================================================
+
+// `fields` needs an explicit nested type — without @ValidateNested +
+// @Type, the global ValidationPipe's whitelist:true strips every property
+// off each array element (they don't match any known DTO shape), so a
+// posted [{name,label}] round-trips as [[]]. Same pattern as
+// AutomationStepDto in automations.dto.ts.
+export class FormFieldDto {
+  @IsString() @IsNotEmpty() name: string;
+  @IsString() @IsNotEmpty() label: string;
+  @IsOptional() @IsBoolean() required?: boolean;
+}
 
 export class CreateFormDto {
   @IsString() @IsNotEmpty() @MaxLength(200)
@@ -29,10 +42,11 @@ export class CreateFormDto {
   @IsOptional() @IsUUID()
   listId?: string;
 
-  // Editor-owned shape. We treat it as opaque JSON — the public endpoint only
-  // uses `fields` to know which values to accept from the submission.
-  @IsOptional() @IsArray()
-  fields?: any[];
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormFieldDto)
+  fields?: FormFieldDto[];
 
   @IsOptional() @IsObject()
   settings?: Record<string, any>;
@@ -52,8 +66,11 @@ export class UpdateFormDto {
   @IsOptional() @IsUUID()
   listId?: string | null;
 
-  @IsOptional() @IsArray()
-  fields?: any[];
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormFieldDto)
+  fields?: FormFieldDto[];
 
   @IsOptional() @IsObject()
   settings?: Record<string, any>;

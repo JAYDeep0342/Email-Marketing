@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginated } from '../../common/dto/pagination.dto';
 import { isValidEmail, normalizeEmail } from '../../common/utils/email.util';
@@ -14,17 +15,24 @@ import {
   ListContactsQueryDto,
   ImportContactsDto,
 } from './dto/contacts.dto';
+import {
+  AUTOMATION_TRIGGER_EVENT,
+  TRIGGER_CONTACT_CREATED,
+} from './contacts.constants';
 
 @Injectable()
 export class ContactsService {
   private readonly logger = new Logger('ContactsService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   // POST /contacts
   async create(tenantId: string, dto: CreateContactDto) {
     const email = normalizeEmail(dto.email);
-    return this.prisma.withCurrentTenant(async (tx) => {
+    const contact = await this.prisma.withCurrentTenant(async (tx) => {
       // Duplicate check (non-deleted)
       const existing = await tx.contact.findFirst({
         where: { email, deletedAt: null },
@@ -59,6 +67,17 @@ export class ContactsService {
         },
       });
     });
+
+    // Fired outside the tx (non-blocking) — same pattern as
+    // forms-submissions.service.ts. AutomationTriggerListener already wraps
+    // its handler in try/catch, so a bad listener can't fail this request.
+    this.events.emit(AUTOMATION_TRIGGER_EVENT, {
+      tenantId,
+      triggerType: TRIGGER_CONTACT_CREATED,
+      contactId: contact.id,
+    });
+
+    return contact;
   }
 
   // GET /contacts
@@ -80,15 +99,25 @@ export class ContactsService {
         where.contactTags = { some: { tagId: q.tagId } };
       }
 
-      const [data, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         tx.contact.findMany({
           where,
           orderBy: { createdAt: 'desc' },
           skip: (q.page - 1) * q.limit,
           take: q.limit,
+          include: {
+            contactTags: { select: { tag: { select: { id: true, name: true } } } },
+          },
         }),
         tx.contact.count({ where }),
       ]);
+      // Same tags-projection as findOne() — flatten contactTags -> tags so
+      // the contacts table can render a Tags column without an extra
+      // request per row.
+      const data = rows.map(({ contactTags, ...rest }) => ({
+        ...rest,
+        tags: contactTags.map((ct) => ct.tag),
+      }));
       return paginated(data, total, q.page, q.limit);
     });
   }

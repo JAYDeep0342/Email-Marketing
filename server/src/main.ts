@@ -1,6 +1,8 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -20,6 +22,34 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const config = app.get(ConfigService);
+
+  // CORS (BUG #5) — allowed origins come from CORS_ORIGINS (comma-separated;
+  // see env.validation.ts / configuration.ts), defaulting to the Vite dev
+  // origin. Frontend auth is Bearer-token based, not cookie-based, but
+  // credentials:true + explicit allowedHeaders keeps Authorization passing
+  // through consistently.
+  app.enableCors({
+    origin: config.get<string[]>('app.corsOrigins'),
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
+  // Security headers (BUG #5). Two defaults deliberately overridden, both
+  // because they'd break a verified-working public route otherwise:
+  //  - contentSecurityPolicy: helmet's default CSP blocks the inline
+  //    scripts Swagger UI's HTML page needs at /docs.
+  //  - crossOriginResourcePolicy: helmet's default 'same-origin' would let
+  //    browsers refuse to load the open-tracking pixel (GET /api/t/o/:token)
+  //    when embedded from an arbitrary webmail/email-client origin, which is
+  //    the entire point of that route.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Razorpay webhook needs the RAW request body to verify its HMAC signature
   // (see BillingWebhookController / INTEGRATION.md). Must be registered

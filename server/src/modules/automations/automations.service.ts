@@ -17,8 +17,12 @@ import { STEP_TYPES, TRIGGER_TYPES } from './automations.constants';
  * CRUD for automations and their steps. All tenant-scoped via withCurrentTenant
  * (automations / automation_steps are RLS-forced).
  *
- * Activation rule: an automation can only go 'active' if it has ≥1 step. A
- * paused automation stops NEW enrollment but does not kill in-flight runs.
+ * Activation rule: an automation can only go 'active' if it has ≥1 step, and
+ * every send_email step must resolve to a real from-address (a signature that
+ * actually exists, or an explicit fromEmail) — otherwise it fails loudly here
+ * instead of silently sending blank-From mail once it's live. Drafts can still
+ * be saved via setSteps() without this yet in place; only activation gates it.
+ * A paused automation stops NEW enrollment but does not kill in-flight runs.
  */
 @Injectable()
 export class AutomationsService {
@@ -125,12 +129,14 @@ export class AutomationsService {
   async activate(id: string) {
     return this.prisma.withCurrentTenant(async (tx) => {
       await this.mustExist(tx, id);
-      const stepCount = await tx.automationStep.count({
+      const steps = await tx.automationStep.findMany({
         where: { automationId: id },
+        select: { stepType: true, config: true },
       });
-      if (stepCount === 0) {
+      if (steps.length === 0) {
         throw new BadRequestException('Cannot activate an automation with no steps');
       }
+      await this.assertSendEmailFromAddress(tx, steps);
       await tx.automation.update({ where: { id }, data: { status: 'active' } });
       return this.loadFull(tx, id);
     });
@@ -157,6 +163,33 @@ export class AutomationsService {
       where: { id },
       include: { steps: { orderBy: { stepOrder: 'asc' } } },
     });
+  }
+
+  // A send_email step must resolve to a real from-address at send time
+  // (EmailProcessor.loadAutomationSource(): signature?.fromEmail ?? cfg.fromEmail ?? '').
+  // Checked here rather than there — activation is the setup-time gate; the
+  // send pipeline itself is untouched. A signatureId that doesn't actually
+  // exist would ALSO resolve to '' at send time, so this verifies the
+  // signature is real, not just that the field is present.
+  private async assertSendEmailFromAddress(
+    tx: any,
+    steps: { stepType: string; config: any }[],
+  ) {
+    for (const s of steps) {
+      if (s.stepType !== 'send_email') continue;
+      const cfg = s.config ?? {};
+      if (cfg.fromEmail) continue;
+      if (cfg.signatureId) {
+        const sig = await tx.signature.findFirst({
+          where: { id: cfg.signatureId },
+          select: { fromEmail: true },
+        });
+        if (sig?.fromEmail) continue;
+      }
+      throw new BadRequestException(
+        'A send_email step needs a from-address — set either a signatureId (pointing to an existing signature) or an explicit fromEmail in the step config.',
+      );
+    }
   }
 
   private assertStepsValid(steps: { stepOrder: number; stepType: string }[]) {

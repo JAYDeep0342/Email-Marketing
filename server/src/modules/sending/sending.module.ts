@@ -41,6 +41,6 @@ import { BillingModule } from '../billing/billing.module';
     EmailProcessor,
     MaintenanceProcessor,
   ],
-  exports: [SendingServerService, SendingDomainService],
+  exports: [SendingServerService, SendingDomainService, MailerService],
 })
 export class SendingModule {}

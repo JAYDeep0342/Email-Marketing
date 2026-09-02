@@ -42,7 +42,7 @@ export class PlanGatingGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const quota = this.reflector.getAllAndOverride<{
       metric: UsageMetric;
-      unit: number;
+      unit: number | ((ctx: ExecutionContext) => number);
     } | null>(CHECK_QUOTA_KEY, [ctx.getHandler(), ctx.getClass()]);
 
     const feature = this.reflector.getAllAndOverride<
@@ -115,15 +115,17 @@ export class PlanGatingGuard implements CanActivate {
 
     // Quota gate.
     if (quota) {
+      const unit =
+        typeof quota.unit === 'function' ? quota.unit(ctx) : quota.unit;
       const limitField = METRIC_TO_LIMIT_FIELD[quota.metric];
       const cap = (limit as any)[limitField] as number | null;
       if (cap !== null && cap !== undefined) {
         const used = await this.currentUsage(tenantId, quota.metric);
-        if (used + quota.unit > cap) {
+        if (used + unit > cap) {
           throw new ForbiddenException({
             code: 'QUOTA_EXCEEDED',
             message: `You have reached your plan's ${quota.metric} limit (${cap}). Upgrade to continue.`,
-            details: { metric: quota.metric, used, cap, requested: quota.unit },
+            details: { metric: quota.metric, used, cap, requested: unit },
           });
         }
       }

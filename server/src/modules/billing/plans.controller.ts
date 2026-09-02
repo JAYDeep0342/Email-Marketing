@@ -7,18 +7,16 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { PlansService } from './plans.service';
 import { CreatePlanDto, UpdatePlanDto } from './dto/billing.dto';
+import { PlatformAdminGuard } from './guards/platform-admin.guard';
 
 /**
- * Public plans (signup / pricing page).
- *
- * NOTE ON AUTH FOR ADMIN ROUTES BELOW: Platform Admin (Step 20) will add a
- * proper super-admin guard. For now these are auth'd via JwtAuthGuard only,
- * meaning any signed-in user could hit them. Before Step 20 ships, wrap the
- * admin controller with a role check or move it to /admin/*.
+ * Public plans (signup / pricing page). Admin plan management (below) is
+ * restricted to platform admins via PlatformAdminGuard (BUG #3).
  */
 @Controller('plans')
 export class PlansController {
@@ -39,10 +37,11 @@ export class PlansController {
 }
 
 /**
- * Admin plan management. See note above about auth â this is a temporary
- * home until Platform Admin (Step 20).
+ * Admin plan management. Restricted to platform admins only (BUG #3) via
+ * PlatformAdminGuard, checked fresh from the DB on every request.
  */
 @Controller('admin/plans')
+@UseGuards(PlatformAdminGuard)
 export class AdminPlansController {
   constructor(private readonly plans: PlansService) {}
 

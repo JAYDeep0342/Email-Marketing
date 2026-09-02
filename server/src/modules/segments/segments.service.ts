@@ -161,10 +161,18 @@ export interface SegmentContact {
 export class SegmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.withCurrentTenant((tx) =>
-      tx.segment.findMany({ orderBy: { createdAt: 'desc' } }),
-    );
+  async list(page: number, limit: number) {
+    return this.prisma.withCurrentTenant(async (tx) => {
+      const [data, total] = await Promise.all([
+        tx.segment.findMany({
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        tx.segment.count(),
+      ]);
+      return paginated(data, total, page, limit);
+    });
   }
 
   create(tenantId: string, dto: CreateSegmentDto) {

@@ -20,14 +20,19 @@ export class ListsController {
   constructor(private readonly lists: ListsService) {}
 
   @Get()
-  list() {
-    return this.lists.list();
+  list(@Query() q: PaginationDto) {
+    return this.lists.list(q.page, q.limit);
   }
 
   @CheckQuota('lists')
   @Post()
   create(@TenantId() tenantId: string, @Body() dto: CreateListDto) {
     return this.lists.create(tenantId, dto);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.lists.findOne(id);
   }
 
   @Patch(':id')
@@ -42,8 +47,12 @@ export class ListsController {
 
   @Post(':id/contacts')
   @HttpCode(200)
-  addContacts(@Param('id') id: string, @Body() dto: AddContactsDto) {
-    return this.lists.addContacts(id, dto.contactIds);
+  addContacts(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: AddContactsDto,
+  ) {
+    return this.lists.addContacts(tenantId, id, dto.contactIds);
   }
 
   @Delete(':id/contacts/:contactId')

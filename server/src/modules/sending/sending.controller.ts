@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import { SendingDomainService } from './sending-domain.service';
@@ -14,6 +15,7 @@ import {
   CreateSendingDomainDto,
   CreateSendingServerDto,
 } from './dto/sending.dto';
+import { PlatformAdminGuard } from '../billing/guards/platform-admin.guard';
 
 @Controller()
 export class SendingController {
@@ -50,19 +52,23 @@ export class SendingController {
   }
 
   // ============================================================
-  //  Sending Servers (PLATFORM-level; dev management only)
-  //  NOTE: not tenant-scoped. Move to Platform Admin later and lock down.
+  //  Sending Servers (PLATFORM-level, shared by all tenants — intentionally
+  //  not tenant-scoped; see sending-server.service.ts). Locked down to
+  //  platform admins only (BUG #4), same guard as AdminPlansController.
   // ============================================================
+  @UseGuards(PlatformAdminGuard)
   @Post('sending-servers')
   createServer(@Body() dto: CreateSendingServerDto) {
     return this.servers.create(dto);
   }
 
+  @UseGuards(PlatformAdminGuard)
   @Get('sending-servers')
   listServers() {
     return this.servers.list();
   }
 
+  @UseGuards(PlatformAdminGuard)
   @Delete('sending-servers/:id')
   removeServer(@Param('id') id: string) {
     return this.servers.remove(id);
