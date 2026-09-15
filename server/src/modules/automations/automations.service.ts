@@ -65,10 +65,18 @@ export class AutomationsService {
           orderBy: { createdAt: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
+          // List rows need a step COUNT, not the full step configs (that's
+          // what findOne()/loadFull() are for) — same _count convention as
+          // FormsService.list()/ListsService.list().
+          include: { _count: { select: { steps: true } } },
         }),
         tx.automation.count(),
       ]);
-      return paginated(rows, total, page, limit);
+      const data = rows.map(({ _count, ...rest }) => ({
+        ...rest,
+        stepCount: _count.steps,
+      }));
+      return paginated(data, total, page, limit);
     });
   }
 

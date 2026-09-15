@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { api, apiCall, bindAuthStore } from '@/lib/api';
+import { api, apiCall } from '@/lib/api';
 import type {
   AuthResponse,
   AuthTokens,
@@ -21,8 +21,9 @@ import type {
  * We DON'T store derived flags like `isAuthenticated` — they're computed
  * from the pair (user + tokens). Storing them would let the two drift.
  *
- * On construction we call bindAuthStore() so the axios client's request
- * interceptor can read tokens WITHOUT importing this file (no cycle).
+ * lib/api.ts reads tokens straight from `useAuthStore.getState()` — see
+ * the cycle note at the top of that file for why importing each other
+ * here is safe.
  */
 
 type Status = 'hydrating' | 'ready';
@@ -91,13 +92,3 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
-
-// ---- Bind to axios so the interceptor can read/refresh tokens ----
-// This runs once at module load. It's a plain function pointer — no
-// subscription, no re-render churn.
-bindAuthStore({
-  getAccessToken: () => useAuthStore.getState().tokens?.accessToken ?? null,
-  getRefreshToken: () => useAuthStore.getState().tokens?.refreshToken ?? null,
-  setTokens: (tokens) => useAuthStore.getState().setTokens(tokens),
-  logout: () => useAuthStore.getState().logout(),
-});

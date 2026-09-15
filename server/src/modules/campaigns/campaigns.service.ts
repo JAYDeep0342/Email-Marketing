@@ -80,6 +80,15 @@ export class CampaignsService {
 
   // ============================================================
   //  2. LIST
+  //
+  //  Enriched with per-campaign send/engagement stats and the target
+  //  list/segment NAME (Acelle-style list row). No formal Prisma relation
+  //  exists from Campaign -> CampaignStat, or from Campaign.listId/segmentId
+  //  -> List/Segment (same "no relation declared" situation as
+  //  findOne()'s own list/segment lookup below, and as CampaignStat
+  //  elsewhere) — so this batches 3 extra lookups by id, each ONE query
+  //  regardless of page size (not per-row): campaign_stats, lists, segments.
+  //  All three are RLS-scoped tables, safe inside this withCurrentTenant tx.
   // ============================================================
   async list(q: ListCampaignsQueryDto) {
     return this.prisma.withCurrentTenant(async (tx) => {
@@ -103,19 +112,61 @@ export class CampaignsService {
         tx.campaign.count({ where }),
       ]);
 
-      const data = rows.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        subject: c.subject,
-        status: c.status,
-        scheduledAt: c.scheduledAt,
-        sentAt: c.sentAt,
-        template: c.template,
-        signature: c.signature,
-        recipientCount: c._count.recipients,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }));
+      const campaignIds = rows.map((c) => c.id);
+      const listIds = [...new Set(rows.map((c) => c.listId).filter((v): v is string => !!v))];
+      const segmentIds = [
+        ...new Set(rows.map((c) => c.segmentId).filter((v): v is string => !!v)),
+      ];
+
+      // Prisma handles an empty `in: []` fine (just returns no rows), so no
+      // need to special-case zero list/segment ids on this page.
+      const [stats, lists, segments] = await Promise.all([
+        tx.campaignStat.findMany({ where: { campaignId: { in: campaignIds } } }),
+        tx.list.findMany({ where: { id: { in: listIds } }, select: { id: true, name: true } }),
+        tx.segment.findMany({
+          where: { id: { in: segmentIds } },
+          select: { id: true, name: true },
+        }),
+      ]);
+      const statsById = new Map(stats.map((s) => [s.campaignId, s]));
+      const listNameById = new Map(lists.map((l) => [l.id, l.name]));
+      const segmentNameById = new Map(segments.map((s) => [s.id, s.name]));
+
+      // Same rate convention as AnalyticsService / dashboard endpoints:
+      // open/click rate are of `delivered`, not `sent`.
+      const rate = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 10000) / 100 : 0);
+
+      const data = rows.map((c: any) => {
+        const s = statsById.get(c.id);
+        const sentCount = s?.sentCount ?? 0;
+        const delivered = s?.deliveredCount ?? 0;
+        return {
+          id: c.id,
+          name: c.name,
+          subject: c.subject,
+          status: c.status,
+          scheduledAt: c.scheduledAt,
+          sentAt: c.sentAt,
+          template: c.template,
+          signature: c.signature,
+          recipientCount: c._count.recipients,
+          target: c.listId
+            ? { type: 'list' as const, id: c.listId, name: listNameById.get(c.listId) ?? null }
+            : c.segmentId
+              ? {
+                  type: 'segment' as const,
+                  id: c.segmentId,
+                  name: segmentNameById.get(c.segmentId) ?? null,
+                }
+              : null,
+          sentCount,
+          totalRecipients: s?.totalRecipients ?? c._count.recipients,
+          openRate: rate(s?.uniqueOpenCount ?? 0, delivered),
+          clickRate: rate(s?.clickCount ?? 0, delivered),
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        };
+      });
 
       return paginated(data, total, q.page, q.limit);
     });

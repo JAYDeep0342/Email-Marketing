@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/stores/auth.store';
 import { ApiErrorBody, AuthTokens, PaginatedEnvelope, PaginationMeta } from '@/types/api';
 
 /**
@@ -11,9 +12,7 @@ import { ApiErrorBody, AuthTokens, PaginatedEnvelope, PaginationMeta } from '@/t
  * Two interceptors:
  *
  *   1. Request: attach `Authorization: Bearer <accessToken>` to every
- *      call, sourced from the auth store. We import the store lazily via
- *      a getter to sidestep the circular dependency (store -> client ->
- *      store).
+ *      call, read straight from `useAuthStore.getState()` at request time.
  *
  *   2. Response: on 401, try a single refresh. Concurrent 401s share ONE
  *      refresh promise via `refreshPromise` so we don't fire N refreshes
@@ -24,22 +23,19 @@ import { ApiErrorBody, AuthTokens, PaginatedEnvelope, PaginationMeta } from '@/t
  *
  * Explicit skip for /auth/refresh — a refresh call getting 401 must NOT
  * loop back into another refresh attempt.
+ *
+ * This file and auth.store.ts import each other (store needs `api`/
+ * `apiCall` for its login/signup actions; this file needs `useAuthStore`
+ * for tokens). That's a safe ESM cycle: both sides only touch the other's
+ * export from INSIDE a function body (called later, once both modules have
+ * finished evaluating), never at module-top-level. We used to avoid the
+ * cycle with a manual `bindAuthStore()` side-effect binding instead — that
+ * turned out to be fragile (a singleton set once, elsewhere, that could
+ * desync from the live store under Vite HMR during a long dev session,
+ * producing exactly the "401s the interceptor should have handled" bug
+ * this replaces). Reading the store directly removes that whole class of
+ * bug — there's nothing to bind, so nothing to get out of sync.
  */
-
-// A lazy getter — set from auth.store.ts once. Prevents a hard import cycle
-// between this file and the store.
-type AuthStoreShape = {
-  getAccessToken: () => string | null;
-  getRefreshToken: () => string | null;
-  setTokens: (tokens: AuthTokens) => void;
-  logout: () => void;
-};
-
-let authStoreRef: AuthStoreShape | null = null;
-
-export function bindAuthStore(store: AuthStoreShape) {
-  authStoreRef = store;
-}
 
 export const api: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -48,7 +44,7 @@ export const api: AxiosInstance = axios.create({
 
 // ---- Request interceptor ----
 api.interceptors.request.use((config) => {
-  const token = authStoreRef?.getAccessToken();
+  const token = useAuthStore.getState().tokens?.accessToken;
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -62,7 +58,7 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshTokens(): Promise<string | null> {
-  const refreshToken = authStoreRef?.getRefreshToken();
+  const refreshToken = useAuthStore.getState().tokens?.refreshToken;
   if (!refreshToken) return null;
 
   // Call refresh WITHOUT going through the axios instance's interceptors —
@@ -74,12 +70,12 @@ async function refreshTokens(): Promise<string | null> {
       { timeout: 10000 },
     );
     const tokens = res.data.data;
-    authStoreRef?.setTokens(tokens);
+    useAuthStore.getState().setTokens(tokens);
     return tokens.accessToken;
   } catch {
     // Refresh failed — session is dead. Wipe tokens; the router will bounce
     // the user to /auth/login on the next protected navigation.
-    authStoreRef?.logout();
+    useAuthStore.getState().logout();
     return null;
   }
 }

@@ -101,6 +101,9 @@ export class AuthService {
           id: result.user.id,
           email: result.user.email,
           emailVerified: false,
+          // A brand-new tenant owner is never a platform admin — matches the
+          // is_platform_admin column's DEFAULT false, no lookup needed.
+          isPlatformAdmin: false,
         },
         ...tokens,
       };
@@ -128,6 +131,7 @@ export class AuthService {
         email: string;
         password_hash: string;
         status: string;
+        is_platform_admin: boolean;
       }>
     >`SELECT * FROM auth_find_user_by_email(${email}) ORDER BY created_at ASC LIMIT 1`;
 
@@ -157,7 +161,12 @@ export class AuthService {
       userAgent,
     );
     return {
-      user: { id: user.id, email: user.email, tenantId: user.tenant_id },
+      user: {
+        id: user.id,
+        email: user.email,
+        tenantId: user.tenant_id,
+        isPlatformAdmin: user.is_platform_admin,
+      },
       ...tokens,
     };
   }

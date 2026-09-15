@@ -27,6 +27,7 @@ const SAFE_USER_SELECT = {
   mfaEnabled: true,
   lastLoginAt: true,
   createdAt: true,
+  isPlatformAdmin: true,
 } as const;
 
 @Injectable()

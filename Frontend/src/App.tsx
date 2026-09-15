@@ -5,11 +5,6 @@ import { queryClient } from '@/lib/query.client';
 import { AppRouter } from '@/routes';
 import { useThemeStore } from '@/stores/theme.store';
 
-// Side-effect import: binds the auth store to the axios interceptor at
-// module-load time. Route components import the store lazily, so we pin
-// it here to be safe.
-import '@/stores/auth.store';
-
 /**
  * App root — Chunk 4.
  *
