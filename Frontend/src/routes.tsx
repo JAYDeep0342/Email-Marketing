@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
 
 import AuthLayout from '@/components/layouts/auth.layout';
 import AppLayout from '@/components/layouts/app.layout';
@@ -17,6 +17,7 @@ import ListDetailPage from '@/app/list-detail.page';
 import TemplatesPage from '@/app/templates.page';
 import SegmentsPage from '@/app/segments.page';
 import CampaignsPage from '@/app/campaigns.page';
+import CampaignWizardPage from '@/app/campaign-wizard.page';
 import CampaignDetailPage from '@/app/campaign-detail.page';
 import AutomationsPage from '@/app/automations.page';
 import AutomationDetailPage from '@/app/automation-detail.page';
@@ -24,6 +25,7 @@ import FormsPage from '@/app/forms.page';
 import FormDetailPage from '@/app/form-detail.page';
 import BillingPage from '@/app/billing.page';
 import AdminDashboardPage from '@/admin/dashboard.page';
+import AdminPlansPage from '@/admin/plans.page';
 
 import {
   RequireAuth,
@@ -90,12 +92,41 @@ const router = createBrowserRouter([
       { path: 'templates', element: <TemplatesPage /> },
       { path: 'segments', element: <SegmentsPage /> },
       { path: 'campaigns', element: <CampaignsPage /> },
+      { path: 'campaigns/new', element: <CampaignWizardPage /> },
       { path: 'campaigns/:id', element: <CampaignDetailPage /> },
       { path: 'automations', element: <AutomationsPage /> },
       { path: 'automations/:id', element: <AutomationDetailPage /> },
       { path: 'forms', element: <FormsPage /> },
       { path: 'forms/:id', element: <FormDetailPage /> },
       { path: 'billing', element: <BillingPage /> },
+    ],
+  },
+
+  // Visual email builder — deliberately OUTSIDE AppLayout (no sidebar/topbar):
+  // it's a full-viewport canvas tool, and this is also the app's first
+  // route-level code-split (`lazy`) — GrapesJS + grapesjs-mjml (~640KB gzip)
+  // only download when one of these two routes is actually visited.
+  {
+    element: (
+      <RequireAuth>
+        <Outlet />
+      </RequireAuth>
+    ),
+    children: [
+      {
+        path: '/app/templates/new/builder',
+        lazy: () => import('@/app/template-builder.page').then((m) => ({ Component: m.default })),
+        // Shown while the ~640KB builder chunk downloads on first visit —
+        // without this, React Router warns ("No HydrateFallback element
+        // provided") and briefly renders nothing for a `lazy` route matched
+        // on initial load.
+        hydrateFallbackElement: <div className="min-h-screen bg-background" />,
+      },
+      {
+        path: '/app/templates/:id/builder',
+        lazy: () => import('@/app/template-builder.page').then((m) => ({ Component: m.default })),
+        hydrateFallbackElement: <div className="min-h-screen bg-background" />,
+      },
     ],
   },
 
@@ -108,6 +139,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <AdminDashboardPage /> },
+      { path: 'plans', element: <AdminPlansPage /> },
     ],
   },
 

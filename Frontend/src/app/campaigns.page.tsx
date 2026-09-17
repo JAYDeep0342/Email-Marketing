@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Copy, Plus, Search } from 'lucide-react';
+import { Copy, Mail, Plus, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { normalizeAxiosError } from '@/lib/api';
-import { CampaignFormDialog } from '@/features/campaigns/campaign-form-dialog';
+import { formatRelativeTime } from '@/lib/utils';
 import { CAMPAIGN_STATUSES, CampaignListItem, CampaignStatus } from '@/features/campaigns/campaigns.api';
 import { DeleteCampaignDialog } from '@/features/campaigns/delete-campaign-dialog';
 import { useCampaignsList, useDuplicateCampaign } from '@/features/campaigns/use-campaigns';
@@ -31,6 +32,11 @@ const STATUS_BADGE_VARIANT: Record<
   paused: 'secondary',
   cancelled: 'destructive',
 };
+
+// Matches the backend's own edit-allowed statuses (ALLOWED_FROM.edit in
+// campaigns.service.ts) — everything else genuinely can't be edited, so
+// "View" is the honest label there, not just cosmetic.
+const EDITABLE_STATUSES: CampaignStatus[] = ['draft', 'paused'];
 
 const PAGE_SIZE = 20;
 
@@ -57,39 +63,68 @@ export default function CampaignsPage() {
   });
   const duplicateMutation = useDuplicateCampaign();
 
-  const [addOpen, setAddOpen] = useState(false);
   const [deletingCampaign, setDeletingCampaign] = useState<CampaignListItem | null>(null);
 
   const columns: DataTableColumn<CampaignListItem>[] = [
     {
       key: 'name',
-      header: 'Name',
+      header: 'Campaign',
       cell: (c) => (
-        <button
-          type="button"
-          onClick={() => navigate(`/app/campaigns/${c.id}`)}
-          className="cursor-pointer font-medium text-primary hover:underline"
-        >
-          {c.name}
-        </button>
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate(`/app/campaigns/${c.id}`)}
+            className="flex cursor-pointer items-center gap-1.5 font-medium text-primary hover:underline"
+          >
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{c.name}</span>
+          </button>
+          <p className="truncate text-xs text-muted-foreground">
+            {c.target ? `To: ${c.target.name ?? 'Unknown'}` : 'No recipients selected'}
+          </p>
+        </div>
       ),
     },
-    { key: 'subject', header: 'Subject', cell: (c) => c.subject },
     {
       key: 'status',
       header: 'Status',
-      cell: (c) => <Badge variant={STATUS_BADGE_VARIANT[c.status]}>{c.status}</Badge>,
+      cell: (c) => (
+        <div className="space-y-1">
+          <Badge variant={STATUS_BADGE_VARIANT[c.status]}>{c.status}</Badge>
+          <p className="whitespace-nowrap text-xs text-muted-foreground">
+            {c.status === 'sent' && c.sentAt
+              ? formatRelativeTime(c.sentAt)
+              : c.status === 'scheduled' && c.scheduledAt
+                ? formatRelativeTime(c.scheduledAt)
+                : formatRelativeTime(c.createdAt)}
+          </p>
+        </div>
+      ),
     },
-    { key: 'recipients', header: 'Recipients', cell: (c) => c.recipientCount },
     {
-      key: 'when',
-      header: 'Scheduled / Sent',
+      key: 'progress',
+      header: 'Progress',
       cell: (c) =>
-        c.sentAt
-          ? new Date(c.sentAt).toLocaleString()
-          : c.scheduledAt
-            ? new Date(c.scheduledAt).toLocaleString()
-            : '—',
+        c.totalRecipients > 0 ? (
+          <div className="w-32 space-y-1">
+            <p className="whitespace-nowrap text-xs font-medium">
+              {c.sentCount.toLocaleString()} / {c.totalRecipients.toLocaleString()}
+            </p>
+            <Progress value={c.sentCount} max={c.totalRecipients} />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: 'openRate',
+      header: 'Open Rate',
+      cell: (c) => <span className="font-semibold">{c.openRate}%</span>,
+    },
+    {
+      key: 'clickRate',
+      header: 'Click Rate',
+      cell: (c) => <span className="font-semibold">{c.clickRate}%</span>,
     },
     {
       key: 'actions',
@@ -97,6 +132,9 @@ export default function CampaignsPage() {
       className: 'text-right',
       cell: (c) => (
         <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/app/campaigns/${c.id}`)}>
+            {EDITABLE_STATUSES.includes(c.status) ? 'Edit' : 'View'}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -118,7 +156,7 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-        <Button onClick={() => setAddOpen(true)}>
+        <Button onClick={() => navigate('/app/campaigns/new')}>
           <Plus className="mr-2 h-4 w-4" />
           Create Campaign
         </Button>
@@ -167,19 +205,16 @@ export default function CampaignsPage() {
             isFetching={isFetching}
             isError={isError}
             errorMessage={error ? normalizeAxiosError(error).message : undefined}
-            emptyMessage="No campaigns yet — create your first one."
+            emptyMessage={
+              search || status !== 'all'
+                ? 'No campaigns match your search.'
+                : 'No campaigns yet — create your first one.'
+            }
             meta={meta}
             onPageChange={setPage}
           />
         </CardContent>
       </Card>
-
-      <CampaignFormDialog
-        key="create"
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onCreated={(id) => navigate(`/app/campaigns/${id}`)}
-      />
 
       <DeleteCampaignDialog
         open={!!deletingCampaign}

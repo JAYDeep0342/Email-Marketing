@@ -4,7 +4,7 @@ import { usePaginatedQuery } from '@/hooks/use-paginated-query';
 import { normalizeAxiosError } from '@/lib/api';
 import {
   activateAutomation,
-  Automation,
+  AutomationListItem,
   AutomationPayload,
   AutomationRun,
   AutomationStep,
@@ -25,7 +25,7 @@ const AUTOMATION_KEY = 'automation-detail' as const;
 const RUNS_KEY = 'automation-runs' as const;
 
 export function useAutomationsList(params: PageParams) {
-  return usePaginatedQuery<Automation>([AUTOMATIONS_KEY, params], () =>
+  return usePaginatedQuery<AutomationListItem>([AUTOMATIONS_KEY, params], () =>
     fetchAutomations(params),
   );
 }

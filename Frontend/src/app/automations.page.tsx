@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
 import { normalizeAxiosError } from '@/lib/api';
 import { AutomationDialog } from '@/features/automations/automation-dialog';
-import { Automation, AutomationStatus } from '@/features/automations/automations.api';
+import { AutomationListItem, AutomationStatus } from '@/features/automations/automations.api';
 import { DeleteAutomationDialog } from '@/features/automations/delete-automation-dialog';
 import {
   useActivateAutomation,
@@ -33,7 +33,7 @@ export default function AutomationsPage() {
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [deletingAutomation, setDeletingAutomation] = useState<Automation | null>(null);
+  const [deletingAutomation, setDeletingAutomation] = useState<AutomationListItem | null>(null);
 
   return (
     <div className="space-y-6">
@@ -83,8 +83,8 @@ export default function AutomationsPage() {
 
 function buildColumns(
   navigate: (path: string) => void,
-  setDeletingAutomation: (a: Automation) => void,
-): DataTableColumn<Automation>[] {
+  setDeletingAutomation: (a: AutomationListItem) => void,
+): DataTableColumn<AutomationListItem>[] {
   return [
     {
       key: 'name',
@@ -105,7 +105,10 @@ function buildColumns(
       header: 'Status',
       cell: (a) => <Badge variant={STATUS_BADGE_VARIANT[a.status]}>{a.status}</Badge>,
     },
-    { key: 'steps', header: 'Steps', cell: (a) => a.steps.length },
+    // stepCount comes from the backend's _count projection now (list rows
+    // never carried the full `steps` array) — ?? 0 kept as a defensive
+    // fallback so a row missing the field still renders instead of crashing.
+    { key: 'steps', header: 'Steps', cell: (a) => a.stepCount ?? 0 },
     {
       key: 'actions',
       header: '',
@@ -115,7 +118,13 @@ function buildColumns(
   ];
 }
 
-function RowActions({ automation, onDelete }: { automation: Automation; onDelete: () => void }) {
+function RowActions({
+  automation,
+  onDelete,
+}: {
+  automation: AutomationListItem;
+  onDelete: () => void;
+}) {
   const activateMutation = useActivateAutomation(automation.id);
   const pauseMutation = usePauseAutomation(automation.id);
 

@@ -17,6 +17,12 @@ export const CAMPAIGN_STATUSES = [
 ] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
+export interface CampaignTarget {
+  type: 'list' | 'segment';
+  id: string;
+  name: string | null;
+}
+
 export interface CampaignListItem {
   id: string;
   name: string;
@@ -27,6 +33,11 @@ export interface CampaignListItem {
   template: { id: string; name: string; isGallery: boolean } | null;
   signature: { id: string; name: string; fromEmail: string } | null;
   recipientCount: number;
+  target: CampaignTarget | null;
+  sentCount: number;
+  totalRecipients: number;
+  openRate: number;
+  clickRate: number;
   createdAt: string;
   updatedAt: string;
 }

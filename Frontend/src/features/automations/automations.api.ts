@@ -58,13 +58,28 @@ export interface Automation {
   updatedAt: string;
 }
 
+// GET /automations (list) never included `steps` — only findOne()/create()/
+// update()/activate()/pause() do (they call the service's loadFull()).
+// A list row gets a step COUNT instead, same as CampaignListItem vs
+// CampaignDetail in the campaigns feature.
+export interface AutomationListItem {
+  id: string;
+  name: string;
+  triggerType: TriggerType;
+  triggerConfig: Record<string, any>;
+  status: AutomationStatus;
+  stepCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PageParams {
   page: number;
   limit: number;
 }
 
 export function fetchAutomations(params: PageParams) {
-  return api.get<PaginatedEnvelope<Automation>>('/automations', { params });
+  return api.get<PaginatedEnvelope<AutomationListItem>>('/automations', { params });
 }
 
 export function fetchAutomation(id: string) {

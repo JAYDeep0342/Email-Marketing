@@ -7,6 +7,7 @@ import {
   createTemplateCategory,
   deleteTemplate,
   duplicateTemplate,
+  fetchTemplate,
   fetchTemplateCategories,
   fetchTemplates,
   ListTemplatesParams,
@@ -16,18 +17,30 @@ import {
 } from './templates.api';
 
 const TEMPLATES_KEY = 'templates-list' as const;
+const TEMPLATE_KEY = 'template-detail' as const;
 
 export function useTemplatesList(params: ListTemplatesParams) {
   return usePaginatedQuery<Template>([TEMPLATES_KEY, params], () => fetchTemplates(params));
+}
+
+export function useTemplate(id: string) {
+  return useQuery({
+    queryKey: [TEMPLATE_KEY, id],
+    queryFn: () => fetchTemplate(id),
+    enabled: !!id,
+  });
 }
 
 export function useTemplateCategories() {
   return useQuery({ queryKey: ['template-categories'], queryFn: fetchTemplateCategories });
 }
 
-function useInvalidateTemplates() {
+function useInvalidateTemplates(id?: string) {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
+  return () => {
+    qc.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
+    if (id) qc.invalidateQueries({ queryKey: [TEMPLATE_KEY, id] });
+  };
 }
 
 export function useCreateTemplate() {
@@ -42,11 +55,11 @@ export function useCreateTemplate() {
   });
 }
 
-export function useUpdateTemplate() {
-  const invalidate = useInvalidateTemplates();
+export function useUpdateTemplate(id?: string) {
+  const invalidate = useInvalidateTemplates(id);
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string } & Partial<TemplatePayload>) =>
-      updateTemplate(id, payload),
+    mutationFn: ({ id: mutationId, ...payload }: { id: string } & Partial<TemplatePayload>) =>
+      updateTemplate(mutationId, payload),
     onSuccess: () => {
       invalidate();
       toast.success('Template updated');

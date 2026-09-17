@@ -41,13 +41,16 @@ export default function SegmentsPage() {
       key: 'match',
       header: 'Match',
       cell: (s) => (
-        <Badge variant="secondary">{s.rules.match === 'all' ? 'All (AND)' : 'Any (OR)'}</Badge>
+        <Badge variant="secondary">{s.rules?.match === 'all' ? 'All (AND)' : 'Any (OR)'}</Badge>
       ),
     },
     {
       key: 'conditions',
       header: 'Conditions',
-      cell: (s) => s.rules.conditions.length,
+      // rules is a scalar JSON column on Segment itself (not a separate
+      // relation like Automation.steps), so it's always present — this is
+      // just cheap defensive insurance, not a fix for a known missing field.
+      cell: (s) => s.rules?.conditions?.length ?? 0,
     },
     {
       key: 'actions',

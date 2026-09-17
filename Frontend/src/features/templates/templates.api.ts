@@ -26,6 +26,9 @@ export interface Template {
   categoryId: string | null;
   isGallery: boolean;
   renderedHtml: string | null;
+  // GrapesJS project data (components/styles/etc.) for 'pro' templates — null
+  // for 'classic' (plain-HTML) templates, which have no design to re-open.
+  designJson: Record<string, unknown> | null;
   thumbnailUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -42,10 +45,16 @@ export function fetchTemplates(params: ListTemplatesParams) {
   return api.get<PaginatedEnvelope<Template>>('/templates', { params });
 }
 
+export function fetchTemplate(id: string) {
+  return apiCall<Template>(() => api.get(`/templates/${id}`));
+}
+
 export interface TemplatePayload {
   name: string;
   categoryId?: string;
   renderedHtml?: string;
+  designJson?: Record<string, unknown>;
+  builderType?: BuilderType;
 }
 
 export function createTemplate(payload: TemplatePayload) {
